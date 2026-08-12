@@ -70,6 +70,11 @@ async def api_config():
     return {"auth": "email"}
 
 
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+
 def _display_name(profile: dict) -> str:
     if profile.get("nickname"):
         return profile["nickname"].strip()

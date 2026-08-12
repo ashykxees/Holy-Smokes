@@ -55,12 +55,27 @@ OWNER_EMAIL=coach@dccs.org
 
 ## Deployment
 
+### Railway
+
+1. Create a new Railway project and connect your `ashykxees/Holy-Smokes` GitHub repo.
+2. In the service settings, add these environment variables:
+   - `JWT_SECRET` (required — generate a long random string)
+   - `OWNER_EMAIL` (optional — makes that user an owner/manager on registration)
+   - `SECURE_COOKIES=true`
+3. Create a volume and mount it to `/app/data` so the SQLite database persists.
+4. Deploy. Railway will build from the `Dockerfile` and start the app.
+5. After it is live, add your custom domain in Railway under **Settings → Domains** and update your DNS records as instructed.
+
+The first user to register with a `@dccs.org` email becomes the owner and a manager.
+
+### Other hosts
+
 Set environment variables on your host:
 
 - `JWT_SECRET` (required, a long random string)
 - `OWNER_EMAIL` (optional, makes that user an owner/manager on registration)
 - `MANAGER_SETUP_SECRET` (optional, legacy self-promotion secret)
 - `SECURE_COOKIES=true` in production
-- `DATABASE_PATH` (optional, defaults to `data/holysmokes.db` locally or `/data/holysmokes.db` on Fly.io)
+- `DATABASE_PATH` (optional, defaults to `data/holysmokes.db` locally)
 
 Run with `uvicorn main:app --host 0.0.0.0 --port 8000` from the `backend` directory.

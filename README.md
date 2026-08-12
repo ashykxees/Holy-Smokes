@@ -61,7 +61,7 @@ OWNER_EMAIL=coach@dccs.org
 2. In the service settings, add these environment variables:
    - `JWT_SECRET` (required — generate a long random string)
    - `OWNER_EMAIL` (optional — makes that user an owner/manager on registration)
-   - `SECURE_COOKIES=true`
+   - `SECURE_COOKIES` (optional — set to `true` only if every connection uses HTTPS)
 3. Create a volume and mount it to `/app/data` so the SQLite database persists.
 4. Deploy. Railway will build from the `Dockerfile` and start the app.
 5. After it is live, add your custom domain in Railway under **Settings → Domains** and update your DNS records as instructed.
@@ -75,7 +75,7 @@ Set environment variables on your host:
 - `JWT_SECRET` (required, a long random string)
 - `OWNER_EMAIL` (optional, makes that user an owner/manager on registration)
 - `MANAGER_SETUP_SECRET` (optional, legacy self-promotion secret)
-- `SECURE_COOKIES=true` in production
+- `SECURE_COOKIES` (optional — set to `true` only if every connection uses HTTPS)
 - `DATABASE_PATH` (optional, defaults to `data/holysmokes.db` locally)
 
 Run with `uvicorn main:app --host 0.0.0.0 --port 8000` from the `backend` directory.

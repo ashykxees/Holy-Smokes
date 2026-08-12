@@ -10,6 +10,8 @@ def _schema() -> str:
     return """
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
+            dc_email TEXT,
+            password_hash TEXT,
             name TEXT NOT NULL,
             first_name TEXT,
             last_name TEXT,
@@ -18,6 +20,7 @@ def _schema() -> str:
             is_dc_employee INTEGER NOT NULL DEFAULT 0,
             picture TEXT,
             is_manager INTEGER NOT NULL DEFAULT 0,
+            is_owner INTEGER NOT NULL DEFAULT 0,
             onboarding_completed INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
@@ -80,6 +83,9 @@ async def _migrate_users(db):
         ("phone", "TEXT"),
         ("is_dc_employee", "INTEGER NOT NULL DEFAULT 0"),
         ("onboarding_completed", "INTEGER NOT NULL DEFAULT 0"),
+        ("dc_email", "TEXT"),
+        ("password_hash", "TEXT"),
+        ("is_owner", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col, dtype in additions:
         if col not in columns:

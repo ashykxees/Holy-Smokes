@@ -1,4 +1,3 @@
-let googleClientId = null;
 let currentUser = null;
 
 const QUOTES = [
@@ -66,6 +65,8 @@ async function initAuth() {
   } catch (err) {
     if (!loginPage && !onboardingPage) {
       window.location.href = '/login.html';
+    } else if (window.onAuthReady) {
+      window.onAuthReady(null);
     }
   }
 }
@@ -75,15 +76,25 @@ function buildNav(user) {
   if (!nav) return;
   const path = window.location.pathname;
   const linkClass = (href) => `nav-link ${path === href ? 'active' : ''}`;
+
   const managerLink = user && user.is_manager
     ? `<a href="/manager.html" class="${linkClass('/manager.html')}">
          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
          Manager
        </a>`
     : '';
+
+  const adminLink = user && user.is_owner
+    ? `<a href="/admin.html" class="${linkClass('/admin.html')}">
+         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+         Admin
+       </a>`
+    : '';
+
   const profilePic = user && user.picture
     ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-8 h-8 rounded-full object-cover border border-gray-200">`
-    : `<div class="w-8 h-8 rounded-full bg-hs-green text-white flex items-center justify-center text-sm font-bold">${(user.name || 'U').charAt(0).toUpperCase()}</div>`;
+    : `<div class="w-8 h-8 rounded-full bg-hs-green text-white flex items-center justify-center text-sm font-bold">${(user && user.name ? user.name : 'U').charAt(0).toUpperCase()}</div>`;
+
   nav.innerHTML = `
     <div class="p-6">
       <a href="/" class="flex items-center gap-3">
@@ -108,12 +119,17 @@ function buildNav(user) {
         Tasks
       </a>
       ${managerLink}
+      ${adminLink}
+      <a href="/team.html" class="${linkClass('/team.html')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </a>
       <a href="/emergency.html" class="${linkClass('/emergency.html')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Emergency
       </a>
       <a href="/settings.html" class="${linkClass('/settings.html')}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         Settings
       </a>
     </nav>
@@ -131,58 +147,6 @@ function buildNav(user) {
       </button>
     </div>
   `;
-}
-
-function loadGoogleScript() {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.accounts) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-async function renderGoogleButton(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  if (!googleClientId) {
-    const cfg = await fetch('/api/config').then(r => r.json());
-    googleClientId = cfg.google_client_id;
-  }
-  await loadGoogleScript();
-  window.google.accounts.id.initialize({
-    client_id: googleClientId,
-    callback: handleGoogleCredential,
-    ux_mode: 'popup',
-  });
-  window.google.accounts.id.renderButton(container, {
-    theme: 'outline',
-    size: 'large',
-    width: 250,
-    text: 'continue_with',
-  });
-}
-
-async function handleGoogleCredential(response) {
-  try {
-    const data = await fetchJSON('/api/auth/google', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token: response.credential }),
-    });
-    if (!data) return;
-    if (data.onboarding_completed) {
-      window.location.href = '/';
-    } else {
-      window.location.href = '/onboarding.html';
-    }
-  } catch (err) {
-    alert(err.message || 'Login failed');
-  }
 }
 
 async function logout() {

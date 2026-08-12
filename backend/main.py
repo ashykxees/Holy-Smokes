@@ -17,9 +17,11 @@ try:
         create_session_token,
         get_current_user,
         get_ws_user_from_cookie,
-        is_manager_email,
+        is_dccs_email,
+        hash_password,
         require_manager,
-        verify_google_id_token,
+        require_owner,
+        verify_password,
     )
 except ImportError:
     import database as db
@@ -27,12 +29,14 @@ except ImportError:
         create_session_token,
         get_current_user,
         get_ws_user_from_cookie,
-        is_manager_email,
+        is_dccs_email,
+        hash_password,
         require_manager,
-        verify_google_id_token,
+        require_owner,
+        verify_password,
     )
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 MAX_PICTURE_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
@@ -63,7 +67,7 @@ def _set_session_cookie(response: JSONResponse, user: dict) -> JSONResponse:
 
 @app.get("/api/config")
 async def api_config():
-    return {"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")}
+    return {"auth": "email"}
 
 
 def _display_name(profile: dict) -> str:
@@ -73,54 +77,92 @@ def _display_name(profile: dict) -> str:
     return " ".join(p for p in parts if p) or profile.get("email", "").split("@")[0]
 
 
-@app.post("/api/auth/google")
-async def auth_google(request: Request):
+@app.post("/api/auth/register")
+async def auth_register(request: Request):
     data = await request.json()
-    id_token_val = data.get("id_token")
-    if not id_token_val:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Missing id_token")
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    confirm_password = data.get("confirm_password", "")
 
-    google_user = verify_google_id_token(id_token_val)
+    if not email or not is_dccs_email(email):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid @dccs.org email is required")
+    if len(password) < 6:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Password must be at least 6 characters")
+    if password != confirm_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Passwords do not match")
+
+    profile = _validate_profile(data, require_complete=True)
+
     database = await db.get_db()
-    cursor = await database.execute(
-        "SELECT is_manager, onboarding_completed FROM users WHERE email = ?",
-        (google_user["email"],),
-    )
-    row = await cursor.fetchone()
+    cursor = await database.execute("SELECT COUNT(*) as count FROM users")
+    count = (await cursor.fetchone())["count"]
 
-    is_manager = is_manager_email(google_user["email"]) or (bool(row["is_manager"]) if row else False)
-    onboarding_completed = bool(row["onboarding_completed"]) if row else False
+    cursor = await database.execute("SELECT email FROM users WHERE email = ?", (email,))
+    if await cursor.fetchone():
+        await database.close()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="An account with this email already exists")
+
+    is_owner = count == 0
+    is_manager = is_owner or bool(os.environ.get("OWNER_EMAIL", "").lower() == email)
 
     await database.execute(
-        """INSERT INTO users (email, name, picture, is_manager, onboarding_completed, created_at)
-           VALUES (?, ?, ?, ?, 0, ?)
-           ON CONFLICT(email) DO UPDATE SET
-             name = COALESCE(excluded.name, name),
-             picture = COALESCE(excluded.picture, picture),
-             is_manager = excluded.is_manager""",
+        """INSERT INTO users (
+               email, dc_email, password_hash, name, first_name, last_name, nickname,
+               phone, is_dc_employee, picture, is_manager, is_owner, onboarding_completed, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
         (
-            google_user["email"],
-            google_user["name"],
-            google_user.get("picture", ""),
+            email,
+            profile["dc_email"],
+            hash_password(password),
+            profile["name"],
+            profile["first_name"],
+            profile["last_name"],
+            profile["nickname"],
+            profile["phone"],
+            int(profile["is_dc_employee"]),
+            profile["picture"],
             int(is_manager),
+            int(is_owner),
             db.now_iso(),
         ),
     )
     await database.commit()
+    cursor = await database.execute(
+        """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
+                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed
+           FROM users WHERE email = ?""",
+        (email,),
+    )
+    row = await cursor.fetchone()
     await database.close()
+    user = dict(row)
+    response = JSONResponse(user)
+    return _set_session_cookie(response, user)
 
-    user = {
-        "email": google_user["email"],
-        "name": google_user["name"],
-        "first_name": None,
-        "last_name": None,
-        "nickname": None,
-        "phone": None,
-        "is_dc_employee": False,
-        "picture": google_user.get("picture", ""),
-        "is_manager": is_manager,
-        "onboarding_completed": onboarding_completed,
-    }
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not email or not is_dccs_email(email):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid @dccs.org email is required")
+
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
+                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed, password_hash
+           FROM users WHERE email = ?""",
+        (email,),
+    )
+    row = await cursor.fetchone()
+    await database.close()
+    if not row or not row["password_hash"] or not verify_password(password, row["password_hash"]):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    user = dict(row)
+    user.pop("password_hash", None)
     response = JSONResponse(user)
     return _set_session_cookie(response, user)
 
@@ -144,6 +186,9 @@ def _validate_profile(data: dict, require_complete: bool = True) -> dict:
     phone = data.get("phone", "").strip()
     is_dc_employee = bool(data.get("is_dc_employee", False))
     picture = data.get("picture", "").strip()
+    dc_email = data.get("dc_email", "").strip().lower()
+    if not dc_email:
+        dc_email = data.get("email", "").strip().lower()
 
     if require_complete:
         if not first_name:
@@ -152,6 +197,8 @@ def _validate_profile(data: dict, require_complete: bool = True) -> dict:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Last name is required")
         if not is_dc_employee and not phone:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Phone number is required unless you are a DC employee")
+        if not dc_email or not is_dccs_email(dc_email):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid @dccs.org DC email is required")
 
     if phone and not re.match(r"^[\d\s\-()+\.]{7,20}$", phone):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Phone number looks invalid")
@@ -160,12 +207,13 @@ def _validate_profile(data: dict, require_complete: bool = True) -> dict:
         if len(picture) > MAX_PICTURE_SIZE:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Profile picture must be under 2 MB")
 
-    display_name = nickname or " ".join([first_name, last_name]).strip() or "Team Member"
+    display_name = nickname or " ".join([first_name, last_name]).strip() or (dc_email.split("@")[0] if dc_email else "Team Member")
     return {
         "first_name": first_name or None,
         "last_name": last_name or None,
         "nickname": nickname or None,
         "phone": phone or None,
+        "dc_email": dc_email or None,
         "is_dc_employee": is_dc_employee,
         "picture": picture or None,
         "name": display_name,
@@ -177,28 +225,42 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
     data = await request.json()
     profile = _validate_profile(data, require_complete=True)
 
+    new_password = data.get("new_password", "")
+    current_password = data.get("current_password", "")
+    if new_password:
+        if len(new_password) < 6:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="New password must be at least 6 characters")
+        if not user.get("password_hash") or not verify_password(current_password, user["password_hash"]):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+
     database = await db.get_db()
+    values = [
+        profile["name"],
+        profile["first_name"],
+        profile["last_name"],
+        profile["nickname"],
+        profile["phone"],
+        profile["dc_email"],
+        int(profile["is_dc_employee"]),
+        profile["picture"],
+    ]
+    password_sql = ""
+    if new_password:
+        password_sql = ", password_hash = ?"
+        values.append(hash_password(new_password))
+    values.append(user["email"])
     await database.execute(
-        """UPDATE users
+        f"""UPDATE users
            SET name = ?, first_name = ?, last_name = ?, nickname = ?, phone = ?,
-               is_dc_employee = ?, picture = ?, onboarding_completed = 1
+               dc_email = ?, is_dc_employee = ?, picture = ? {password_sql}
            WHERE email = ?""",
-        (
-            profile["name"],
-            profile["first_name"],
-            profile["last_name"],
-            profile["nickname"],
-            profile["phone"],
-            int(profile["is_dc_employee"]),
-            profile["picture"],
-            user["email"],
-        ),
+        values,
     )
     await database.commit()
 
     cursor = await database.execute(
-        """SELECT email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, onboarding_completed
+        """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
+                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed
            FROM users WHERE email = ?""",
         (user["email"],),
     )
@@ -214,7 +276,8 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 async def list_users(user: dict = Depends(get_current_user)):
     database = await db.get_db()
     cursor = await database.execute(
-        """SELECT email, name, first_name, last_name, nickname, picture FROM users ORDER BY name"""
+        """SELECT email, dc_email, name, first_name, last_name, nickname, picture, is_manager
+           FROM users ORDER BY name"""
     )
     rows = await cursor.fetchall()
     await database.close()
@@ -341,24 +404,34 @@ async def chat_history(manager: bool = False, user: dict = Depends(get_current_u
     return list(reversed([dict(r) for r in rows]))
 
 
-@app.post("/api/promote")
-async def promote_manager(request: Request, user: dict = Depends(get_current_user)):
+@app.get("/api/admin/users")
+async def admin_list_users(user: dict = Depends(require_owner)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
+                  is_manager, is_owner, created_at
+           FROM users ORDER BY name"""
+    )
+    rows = await cursor.fetchall()
+    await database.close()
+    return [dict(r) for r in rows]
+
+
+@app.patch("/api/admin/users/{email}/manager")
+async def admin_set_manager(email: str, request: Request, user: dict = Depends(require_owner)):
     data = await request.json()
-    secret = data.get("secret", "")
-    if secret != os.environ.get("MANAGER_SETUP_SECRET", ""):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Invalid setup secret")
+    is_manager = bool(data.get("is_manager", False))
+    target_email = email.lower().strip()
+    if target_email == user["email"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="You cannot change your own manager status")
     database = await db.get_db()
     await database.execute(
-        "UPDATE users SET is_manager = 1 WHERE email = ?",
-        (user["email"],),
+        "UPDATE users SET is_manager = ? WHERE email = ?",
+        (int(is_manager), target_email),
     )
     await database.commit()
-    cursor = await database.execute("SELECT * FROM users WHERE email = ?", (user["email"],))
-    row = await cursor.fetchone()
     await database.close()
-    user_row = dict(row)
-    response = JSONResponse({"is_manager": True})
-    return _set_session_cookie(response, user_row)
+    return {"email": target_email, "is_manager": is_manager}
 
 
 async def broadcast(message: dict, channel: str):

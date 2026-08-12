@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/app.js"></script>
+</head>
+<body data-login="true" class="min-h-screen flex items-center justify-center bg-white p-4">
+  <div class="text-center max-w-sm w-full">
+    <img src="/assets/logo.png" alt="Holy Smokes BBQ Team" class="h-32 w-auto mx-auto mb-6 object-contain">
+    <h1 class="text-3xl font-bold tracking-tight mb-2">HOLY SMOKES</h1>
+    <p class="text-gray-500 mb-8">BBQ Team Management</p>
+
+    <form id="login-form" class="card space-y-4 text-left">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">DC Email</label>
+        <input id="email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="you@dccs.org">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input id="password" type="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+      </div>
+      <button type="submit" class="btn-primary w-full">Log In</button>
+      <p class="text-center text-sm text-gray-500">New to the team? <a href="/onboarding.html" class="text-green-700 hover:underline">Create an account</a></p>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      try {
+        const data = await fetchJSON('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!data) return;
+        window.location.href = data.onboarding_completed ? '/' : '/onboarding.html';
+      } catch (err) {
+        alert(err.message || 'Login failed');
+      }
+    });
+  </script>
+</body>
+</html>

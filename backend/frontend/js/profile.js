@@ -2,11 +2,15 @@ const MAX_PICTURE_SIZE = 2 * 1024 * 1024;
 
 function onAuthReady(user) {
   const isOnboarding = window.location.pathname === '/onboarding.html';
-  if (isOnboarding && user.onboarding_completed) {
+  if (isOnboarding && user && user.onboarding_completed) {
     window.location.href = '/';
     return;
   }
-  if (!isOnboarding && !user.onboarding_completed) {
+  if (!isOnboarding && !user) {
+    window.location.href = '/login.html';
+    return;
+  }
+  if (!isOnboarding && user && !user.onboarding_completed) {
     window.location.href = '/onboarding.html';
     return;
   }
@@ -23,12 +27,15 @@ function initProfileForm(user, isOnboarding) {
 
   if (!form) return;
 
-  if (user.first_name) document.getElementById('first-name').value = user.first_name;
-  if (user.last_name) document.getElementById('last-name').value = user.last_name;
-  if (user.nickname) document.getElementById('nickname').value = user.nickname;
-  if (user.phone) document.getElementById('phone').value = user.phone;
-  if (dcCheckbox) dcCheckbox.checked = !!user.is_dc_employee;
-  if (picturePreview && user.picture) picturePreview.src = user.picture;
+  if (user) {
+    if (user.first_name) document.getElementById('first-name').value = user.first_name;
+    if (user.last_name) document.getElementById('last-name').value = user.last_name;
+    if (user.nickname) document.getElementById('nickname').value = user.nickname;
+    if (user.phone) document.getElementById('phone').value = user.phone;
+    if (user.dc_email) document.getElementById('dc-email').value = user.dc_email;
+    if (dcCheckbox) dcCheckbox.checked = !!user.is_dc_employee;
+    if (picturePreview && user.picture) picturePreview.src = user.picture;
+  }
 
   function togglePhone() {
     if (!phoneGroup) return;
@@ -67,8 +74,9 @@ function initProfileForm(user, isOnboarding) {
     const nickname = document.getElementById('nickname').value.trim();
     const phone = document.getElementById('phone').value.trim();
     const is_dc_employee = dcCheckbox ? dcCheckbox.checked : false;
+    const dc_email = (document.getElementById('dc-email').value || '').trim().toLowerCase();
     let picture = picturePreview && picturePreview.dataset.value ? picturePreview.dataset.value : '';
-    if (!picture && user.picture) picture = user.picture;
+    if (!picture && user && user.picture) picture = user.picture;
 
     if (!first_name || !last_name) {
       alert('First and last name are required.');
@@ -79,19 +87,64 @@ function initProfileForm(user, isOnboarding) {
       return;
     }
 
+    const payload = { first_name, last_name, nickname, phone, is_dc_employee, dc_email, picture };
+
+    if (isOnboarding) {
+      const email = (document.getElementById('email').value || '').trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      const confirm_password = document.getElementById('confirm-password').value;
+      if (!email) {
+        alert('DC Email is required.');
+        return;
+      }
+      if (!email.endsWith('@dccs.org')) {
+        alert('Email must be a @dccs.org address.');
+        return;
+      }
+      if (password.length < 6) {
+        alert('Password must be at least 6 characters.');
+        return;
+      }
+      if (password !== confirm_password) {
+        alert('Passwords do not match.');
+        return;
+      }
+      payload.email = email;
+      payload.password = password;
+      payload.confirm_password = confirm_password;
+    }
+
+    if (!isOnboarding) {
+      const newPassword = document.getElementById('new-password');
+      const currentPassword = document.getElementById('current-password');
+      if (newPassword && newPassword.value) {
+        if (newPassword.value.length < 6) {
+          alert('New password must be at least 6 characters.');
+          return;
+        }
+        if (!currentPassword || !currentPassword.value) {
+          alert('Current password is required to set a new password.');
+          return;
+        }
+        payload.new_password = newPassword.value;
+        payload.current_password = currentPassword.value;
+      }
+    }
+
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     try {
-      await fetchJSON('/api/profile', {
+      const endpoint = isOnboarding ? '/api/auth/register' : '/api/profile';
+      await fetchJSON(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name, last_name, nickname, phone, is_dc_employee, picture }),
+        body: JSON.stringify(payload),
       });
       window.location.href = '/';
     } catch (err) {
       alert(err.message);
       saveBtn.disabled = false;
-      saveBtn.textContent = isOnboarding ? 'Complete Setup' : 'Save Changes';
+      saveBtn.textContent = isOnboarding ? 'Create Account' : 'Save Changes';
     }
   });
 }

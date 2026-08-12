@@ -14,7 +14,7 @@
     <div class="text-center mb-8">
       <img src="/assets/logo.png" alt="Holy Smokes BBQ Team" class="h-24 w-auto mx-auto mb-4 object-contain">
       <h1 class="text-3xl font-bold">Welcome to the team!</h1>
-      <p class="text-gray-500 mt-1">Finish setting up your profile.</p>
+      <p class="text-gray-500 mt-1">Create your account to get started.</p>
     </div>
 
     <form id="profile-form" class="card space-y-5">
@@ -22,6 +22,12 @@
         <img id="picture-preview" src="" alt="" class="w-24 h-24 rounded-full object-cover border-2 border-hs-green mb-3 bg-gray-100">
         <label class="text-sm font-medium text-gray-700">Profile Picture</label>
         <input id="profile-picture" type="file" accept="image/*" class="mt-2 text-sm text-gray-600">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">DC Email <span class="text-red-500">*</span></label>
+        <input id="email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="you@dccs.org">
+        <input id="dc-email" type="hidden">
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -41,6 +47,17 @@
         <p class="text-xs text-gray-500 mt-1">If you add a nickname, the team will see this instead of your real name.</p>
       </div>
 
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+          <input id="password" type="password" required minlength="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
+          <input id="confirm-password" type="password" required minlength="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+      </div>
+
       <div id="phone-group">
         <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
         <input id="phone" type="tel" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
@@ -51,8 +68,18 @@
         <span class="text-sm text-gray-700">I'm a DC Employee</span>
       </label>
 
-      <button id="save-button" type="submit" class="btn-primary w-full">Complete Setup</button>
+      <button id="save-button" type="submit" class="btn-primary w-full">Create Account</button>
+
+      <p class="text-center text-sm text-gray-500">Already have an account? <a href="/login.html" class="text-green-700 hover:underline">Log in</a></p>
     </form>
   </div>
+
+  <script>
+    const emailInput = document.getElementById('email');
+    const dcEmailInput = document.getElementById('dc-email');
+    if (emailInput && dcEmailInput) {
+      emailInput.addEventListener('input', () => { dcEmailInput.value = emailInput.value; });
+    }
+  </script>
 </body>
 </html>

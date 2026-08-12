@@ -24,6 +24,11 @@
         <input id="profile-picture" type="file" accept="image/*" class="mt-2 text-sm text-gray-600">
       </div>
 
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">DC Email</label>
+        <input id="dc-email" type="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+      </div>
+
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
@@ -51,45 +56,20 @@
         <span class="text-sm text-gray-700">I'm a DC Employee</span>
       </label>
 
-      <div class="pt-2 border-t border-gray-100">
-        <p class="text-sm text-gray-500 mb-2">Want to become a manager? Ask your coach for the setup secret.</p>
-        <div class="flex gap-2">
-          <input id="promote-secret" type="text" placeholder="Manager setup secret" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
-          <button type="button" id="promote-button" class="btn-secondary">Become Manager</button>
+      <div class="pt-4 border-t border-gray-100 space-y-4">
+        <p class="text-sm text-gray-500">Change your password (optional).</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+          <input id="current-password" type="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+          <input id="new-password" type="password" minlength="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
         </div>
       </div>
 
       <button id="save-button" type="submit" class="btn-primary w-full">Save Changes</button>
     </form>
   </main>
-
-  <script>
-    function onAuthReady(user) {
-      const isOnboarding = window.location.pathname === '/settings.html';
-      if (!isOnboarding && !user.onboarding_completed) {
-        window.location.href = '/onboarding.html';
-        return;
-      }
-      initProfileForm(user, false);
-
-      const promoteBtn = document.getElementById('promote-button');
-      if (promoteBtn) {
-        promoteBtn.addEventListener('click', async () => {
-          const secret = document.getElementById('promote-secret').value.trim();
-          try {
-            await fetchJSON('/api/promote', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ secret }),
-            });
-            alert('You are now a manager!');
-            window.location.reload();
-          } catch (err) {
-            alert(err.message);
-          }
-        });
-      }
-    }
-  </script>
 </body>
 </html>

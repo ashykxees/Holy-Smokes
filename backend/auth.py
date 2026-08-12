@@ -1,14 +1,17 @@
+import hashlib
+import hmac
 import os
+import secrets
 from datetime import datetime, timezone, timedelta
+
 from fastapi import Request, HTTPException, status, WebSocketException
 from jose import jwt, JWTError
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
 
 try:
     from . import database as db
 except ImportError:
     import database as db
+
 
 def _get_required_env(name: str) -> str:
     value = os.environ.get(name)
@@ -17,15 +20,39 @@ def _get_required_env(name: str) -> str:
     return value
 
 
-def google_client_id() -> str:
-    return _get_required_env("GOOGLE_CLIENT_ID")
-
-
 def jwt_secret() -> str:
     return _get_required_env("JWT_SECRET")
 
 
-MANAGER_EMAILS = {e.strip().lower() for e in os.environ.get("MANAGER_EMAILS", "").split(",") if e.strip()}
+def _normalize_email(email: str) -> str:
+    return email.lower().strip()
+
+
+def is_dccs_email(email: str) -> bool:
+    return _normalize_email(email).endswith("@dccs.org")
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    iterations = 100_000
+    hash_value = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("ascii"), iterations
+    ).hex()
+    return f"pbkdf2:sha256:{iterations}:{salt}:{hash_value}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        _, algo, iterations, salt, hash_value = stored.split(":")
+        new_hash = hashlib.pbkdf2_hmac(
+            algo,
+            password.encode("utf-8"),
+            salt.encode("ascii"),
+            int(iterations),
+        ).hex()
+        return hmac.compare_digest(new_hash, hash_value)
+    except Exception:
+        return False
 
 
 def create_session_token(user: dict) -> str:
@@ -35,6 +62,7 @@ def create_session_token(user: dict) -> str:
         "name": user["name"],
         "picture": user.get("picture", ""),
         "is_manager": user.get("is_manager", False),
+        "is_owner": user.get("is_owner", False),
         "onboarding_completed": user.get("onboarding_completed", False),
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }
@@ -56,8 +84,8 @@ async def get_current_user(request: Request) -> dict:
     email = payload.get("email") or payload.get("sub")
     database = await db.get_db()
     cursor = await database.execute(
-        """SELECT email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, onboarding_completed, created_at
+        """SELECT email, dc_email, password_hash, name, first_name, last_name, nickname, phone,
+                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed, created_at
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -72,6 +100,13 @@ async def require_manager(request: Request) -> dict:
     user = await get_current_user(request)
     if not user.get("is_manager"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Manager access required")
+    return user
+
+
+async def require_owner(request: Request) -> dict:
+    user = await get_current_user(request)
+    if not user.get("is_owner"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Owner access required")
     return user
 
 
@@ -92,28 +127,3 @@ def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
         return user
     except JWTError as exc:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid session") from exc
-
-
-def is_manager_email(email: str) -> bool:
-    return email.lower() in MANAGER_EMAILS
-
-
-def verify_google_id_token(token: str) -> dict:
-    try:
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), google_client_id())
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=f"Invalid Google token: {exc}") from exc
-
-    email = idinfo.get("email", "").lower().strip()
-    if not email:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Email not provided")
-
-    hd = idinfo.get("hd")
-    if hd != "dccs.org" and not email.endswith("@dccs.org"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Only @dccs.org accounts are allowed")
-
-    return {
-        "email": email,
-        "name": idinfo.get("name", email.split("@")[0]),
-        "picture": idinfo.get("picture", ""),
-    }

@@ -11,9 +11,15 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-dotenv",
-    "google-auth",
     "python-jose[cryptography]",
     "aiosqlite",
     "websockets",
-    "requests",
+    "python-multipart",
 ]
+
+[tool.setuptools]
+packages = ["app", "backend"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+backend = ["frontend/**/*", "data/.gitkeep"]

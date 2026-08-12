@@ -306,15 +306,30 @@ async def list_users(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/tasks")
-async def list_tasks(user: dict = Depends(get_current_user)):
+async def list_tasks(request: Request, user: dict = Depends(get_current_user)):
     database = await db.get_db()
-    if user.get("is_manager"):
-        cursor = await database.execute("SELECT * FROM tasks ORDER BY created_at DESC")
+    completed = request.query_params.get("completed")
+    if completed is not None:
+        completed_flag = completed.lower() in ("1", "true", "yes")
+        completed_int = 1 if completed_flag else 0
+        if user.get("is_manager"):
+            cursor = await database.execute(
+                "SELECT * FROM tasks WHERE completed = ? ORDER BY completed_at DESC, created_at DESC",
+                (completed_int,),
+            )
+        else:
+            cursor = await database.execute(
+                "SELECT * FROM tasks WHERE (assigned_to = ? OR assigned_to = 'all') AND completed = ? ORDER BY completed_at DESC, created_at DESC",
+                (user["email"], completed_int),
+            )
     else:
-        cursor = await database.execute(
-            "SELECT * FROM tasks WHERE assigned_to = ? OR assigned_to = 'all' ORDER BY created_at DESC",
-            (user["email"],),
-        )
+        if user.get("is_manager"):
+            cursor = await database.execute("SELECT * FROM tasks ORDER BY created_at DESC")
+        else:
+            cursor = await database.execute(
+                "SELECT * FROM tasks WHERE assigned_to = ? OR assigned_to = 'all' ORDER BY created_at DESC",
+                (user["email"],),
+            )
     rows = await cursor.fetchall()
     await database.close()
     return [dict(r) for r in rows]

@@ -7,8 +7,21 @@ from google.auth.transport import requests as google_requests
 
 import database as db
 
-GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
-JWT_SECRET = os.environ["JWT_SECRET"]
+def _get_required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+def google_client_id() -> str:
+    return _get_required_env("GOOGLE_CLIENT_ID")
+
+
+def jwt_secret() -> str:
+    return _get_required_env("JWT_SECRET")
+
+
 MANAGER_EMAILS = {e.strip().lower() for e in os.environ.get("MANAGER_EMAILS", "").split(",") if e.strip()}
 
 
@@ -22,12 +35,12 @@ def create_session_token(user: dict) -> str:
         "onboarding_completed": user.get("onboarding_completed", False),
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return jwt.encode(payload, jwt_secret(), algorithm="HS256")
 
 
 def decode_session_token(token: str) -> dict:
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return jwt.decode(token, jwt_secret(), algorithms=["HS256"])
     except JWTError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid session") from exc
 
@@ -71,7 +84,7 @@ def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
     if not token:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Missing session cookie")
     try:
-        user = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        user = jwt.decode(token, jwt_secret(), algorithms=["HS256"])
         user["email"] = user.get("email") or user.get("sub")
         return user
     except JWTError as exc:
@@ -84,7 +97,7 @@ def is_manager_email(email: str) -> bool:
 
 def verify_google_id_token(token: str) -> dict:
     try:
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), google_client_id())
     except ValueError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=f"Invalid Google token: {exc}") from exc
 

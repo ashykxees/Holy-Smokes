@@ -13,7 +13,6 @@ load_dotenv()
 
 import database as db
 from auth import (
-    GOOGLE_CLIENT_ID,
     create_session_token,
     get_current_user,
     get_ws_user_from_cookie,
@@ -53,7 +52,7 @@ def _set_session_cookie(response: JSONResponse, user: dict) -> JSONResponse:
 
 @app.get("/api/config")
 async def api_config():
-    return {"google_client_id": GOOGLE_CLIENT_ID}
+    return {"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")}
 
 
 def _display_name(profile: dict) -> str:

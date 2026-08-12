@@ -24,7 +24,7 @@
         <input id="password" type="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
       </div>
       <button type="submit" class="btn-primary w-full">Log In</button>
-      <p class="text-center text-sm text-gray-500">New to the team? <a href="/onboarding.html" class="text-green-700 hover:underline">Create an account</a></p>
+      <p class="text-center text-sm text-gray-500">New to the team? <a href="/onboarding" class="text-green-700 hover:underline">Create an account</a></p>
     </form>
   </div>
 
@@ -40,7 +40,7 @@
           body: JSON.stringify({ email, password }),
         });
         if (!data) return;
-        window.location.href = data.onboarding_completed ? '/' : '/onboarding.html';
+        window.location.href = data.onboarding_completed ? '/' : '/onboarding';
       } catch (err) {
         alert(err.message || 'Login failed');
       }

@@ -22,7 +22,7 @@ async function fetchJSON(url, options = {}) {
   const res = await fetch(url, { credentials: 'include', ...options });
   if (res.status === 401) {
     if (!isAuthPage()) {
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     }
     return null;
   }
@@ -35,25 +35,25 @@ async function fetchJSON(url, options = {}) {
 
 function isAuthPage() {
   const path = window.location.pathname;
-  return path === '/login.html' || path === '/onboarding.html';
+  return path === '/login' || path === '/onboarding';
 }
 
 function isOnboardingPage() {
-  return window.location.pathname === '/onboarding.html';
+  return window.location.pathname === '/onboarding';
 }
 
 async function initAuth() {
-  const loginPage = window.location.pathname === '/login.html';
+  const loginPage = window.location.pathname === '/login';
   const onboardingPage = isOnboardingPage();
   try {
     const user = await fetchJSON('/api/me');
     currentUser = user;
     if (loginPage && user) {
-      window.location.href = user.onboarding_completed ? '/' : '/onboarding.html';
+      window.location.href = user.onboarding_completed ? '/' : '/onboarding';
       return;
     }
     if (user && !user.onboarding_completed && !onboardingPage) {
-      window.location.href = '/onboarding.html';
+      window.location.href = '/onboarding';
       return;
     }
     if (user && user.onboarding_completed && onboardingPage) {
@@ -64,7 +64,7 @@ async function initAuth() {
     if (window.onAuthReady) window.onAuthReady(user);
   } catch (err) {
     if (!loginPage && !onboardingPage) {
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     } else if (window.onAuthReady) {
       window.onAuthReady(null);
     }
@@ -78,14 +78,14 @@ function buildNav(user) {
   const linkClass = (href) => `nav-link ${path === href ? 'active' : ''}`;
 
   const managerLink = user && user.is_manager
-    ? `<a href="/manager.html" class="${linkClass('/manager.html')}">
+    ? `<a href="/manager" class="${linkClass('/manager')}">
          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
          Manager
        </a>`
     : '';
 
   const adminLink = user && user.is_owner
-    ? `<a href="/admin.html" class="${linkClass('/admin.html')}">
+    ? `<a href="/admin" class="${linkClass('/admin')}">
          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
          Admin
        </a>`
@@ -110,25 +110,25 @@ function buildNav(user) {
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Dashboard
       </a>
-      <a href="/chat.html" class="${linkClass('/chat.html')}">
+      <a href="/chat" class="${linkClass('/chat')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         Chat
       </a>
-      <a href="/tasks.html" class="${linkClass('/tasks.html')}">
+      <a href="/tasks" class="${linkClass('/tasks')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         Tasks
       </a>
       ${managerLink}
       ${adminLink}
-      <a href="/team.html" class="${linkClass('/team.html')}">
+      <a href="/team" class="${linkClass('/team')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Team
       </a>
-      <a href="/emergency.html" class="${linkClass('/emergency.html')}">
+      <a href="/emergency" class="${linkClass('/emergency')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Emergency
       </a>
-      <a href="/settings.html" class="${linkClass('/settings.html')}">
+      <a href="/settings" class="${linkClass('/settings')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         Settings
       </a>
@@ -151,7 +151,7 @@ function buildNav(user) {
 
 async function logout() {
   await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-  window.location.href = '/login.html';
+  window.location.href = '/login';
 }
 
 function randomQuote() {

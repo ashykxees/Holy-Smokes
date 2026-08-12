@@ -51,13 +51,25 @@ app = FastAPI(title="Holy Smokes BBQ Team", lifespan=lifespan)
 app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
 
 
-def _set_session_cookie(response: JSONResponse, user: dict) -> JSONResponse:
+def _is_https_request(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    if forwarded_proto:
+        return forwarded_proto == "https"
+    env_setting = os.environ.get("SECURE_COOKIES", "").lower()
+    if env_setting in ("true", "1"):
+        return True
+    if env_setting in ("false", "0"):
+        return False
+    return request.url.scheme == "https"
+
+
+def _set_session_cookie(response: JSONResponse, user: dict, request: Request) -> JSONResponse:
     token = create_session_token(user)
     response.set_cookie(
         key="session",
         value=token,
         httponly=True,
-        secure=os.environ.get("SECURE_COOKIES", "false").lower() == "true",
+        secure=_is_https_request(request),
         samesite="lax",
         max_age=60 * 60 * 24 * 7,
         path="/",
@@ -142,7 +154,7 @@ async def auth_register(request: Request):
     await database.close()
     user = dict(row)
     response = JSONResponse(user)
-    return _set_session_cookie(response, user)
+    return _set_session_cookie(response, user, request)
 
 
 @app.post("/api/auth/login")
@@ -169,13 +181,18 @@ async def auth_login(request: Request):
     user = dict(row)
     user.pop("password_hash", None)
     response = JSONResponse(user)
-    return _set_session_cookie(response, user)
+    return _set_session_cookie(response, user, request)
 
 
 @app.post("/api/logout")
-async def logout():
+async def logout(request: Request):
     response = JSONResponse({"ok": True})
-    response.delete_cookie("session", path="/")
+    response.delete_cookie(
+        "session",
+        path="/",
+        secure=_is_https_request(request),
+        samesite="lax",
+    )
     return response
 
 
@@ -512,6 +529,11 @@ async def websocket_chat(websocket: WebSocket, manager: bool = False):
 
 @app.get("/{path:path}")
 async def serve_spa(path: str):
+    # If the path has no extension, try serving the matching .html page.
+    if path and "." not in os.path.basename(path):
+        html_path = os.path.join(FRONTEND_DIR, path + ".html")
+        if os.path.isfile(html_path):
+            return FileResponse(html_path)
     file_path = os.path.join(FRONTEND_DIR, path)
     if path and os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)

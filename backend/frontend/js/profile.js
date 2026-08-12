@@ -1,17 +1,17 @@
 const MAX_PICTURE_SIZE = 2 * 1024 * 1024;
 
 function onAuthReady(user) {
-  const isOnboarding = window.location.pathname === '/onboarding.html';
+  const isOnboarding = window.location.pathname === '/onboarding';
   if (isOnboarding && user && user.onboarding_completed) {
     window.location.href = '/';
     return;
   }
   if (!isOnboarding && !user) {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
     return;
   }
   if (!isOnboarding && user && !user.onboarding_completed) {
-    window.location.href = '/onboarding.html';
+    window.location.href = '/onboarding';
     return;
   }
   initProfileForm(user, isOnboarding);

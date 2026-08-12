@@ -93,7 +93,9 @@ async def get_current_user(request: Request) -> dict:
     await database.close()
     if not row:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return dict(row)
+    user = dict(row)
+    user.pop("password_hash", None)
+    return user
 
 
 async def require_manager(request: Request) -> dict:

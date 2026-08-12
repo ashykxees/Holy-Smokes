@@ -52,15 +52,14 @@ app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets"))
 
 
 def _is_https_request(request: Request) -> bool:
-    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
-    if forwarded_proto:
-        return forwarded_proto == "https"
     env_setting = os.environ.get("SECURE_COOKIES", "").lower()
     if env_setting in ("true", "1"):
         return True
     if env_setting in ("false", "0"):
         return False
-    return request.url.scheme == "https"
+    # Default to non-secure cookies so the app works on both HTTP and HTTPS.
+    # Set SECURE_COOKIES=true when you are sure every connection uses HTTPS.
+    return False
 
 
 def _set_session_cookie(response: JSONResponse, user: dict, request: Request) -> JSONResponse:

@@ -2,7 +2,13 @@ import os
 import aiosqlite
 from datetime import datetime, timezone
 
-_default_db = "/data/holysmokes.db" if os.environ.get("FLY_APP_NAME") else "data/holysmokes.db"
+if os.environ.get("RAILWAY_VOLUME_MOUNT_PATH"):
+    _default_db = os.path.join(os.environ["RAILWAY_VOLUME_MOUNT_PATH"], "holysmokes.db")
+elif os.environ.get("FLY_APP_NAME"):
+    _default_db = "/data/holysmokes.db"
+else:
+    _default_db = "data/holysmokes.db"
+
 DB_PATH = os.environ.get("DATABASE_PATH", _default_db)
 
 

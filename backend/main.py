@@ -70,7 +70,7 @@ def _set_session_cookie(response: JSONResponse, user: dict, request: Request) ->
         httponly=True,
         secure=_is_https_request(request),
         samesite="lax",
-        max_age=60 * 60 * 24 * 7,
+        max_age=60 * 60 * 24 * 30,
         path="/",
     )
     return response

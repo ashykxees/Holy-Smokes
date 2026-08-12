@@ -11,15 +11,26 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 load_dotenv()
 
-import database as db
-from auth import (
-    create_session_token,
-    get_current_user,
-    get_ws_user_from_cookie,
-    is_manager_email,
-    require_manager,
-    verify_google_id_token,
-)
+try:
+    from . import database as db
+    from .auth import (
+        create_session_token,
+        get_current_user,
+        get_ws_user_from_cookie,
+        is_manager_email,
+        require_manager,
+        verify_google_id_token,
+    )
+except ImportError:
+    import database as db
+    from auth import (
+        create_session_token,
+        get_current_user,
+        get_ws_user_from_cookie,
+        is_manager_email,
+        require_manager,
+        verify_google_id_token,
+    )
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 MAX_PICTURE_SIZE = 2 * 1024 * 1024  # 2 MB

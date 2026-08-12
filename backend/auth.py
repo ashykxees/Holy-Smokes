@@ -5,7 +5,10 @@ from jose import jwt, JWTError
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-import database as db
+try:
+    from . import database as db
+except ImportError:
+    import database as db
 
 def _get_required_env(name: str) -> str:
     value = os.environ.get(name)

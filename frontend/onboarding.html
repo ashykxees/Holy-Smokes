@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/app.js"></script>
+  <script src="/js/profile.js"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+  <div class="w-full max-w-lg">
+    <div class="text-center mb-8">
+      <img src="/assets/logo.png" alt="Holy Smokes BBQ Team" class="h-24 w-auto mx-auto mb-4 object-contain">
+      <h1 class="text-3xl font-bold">Welcome to the team!</h1>
+      <p class="text-gray-500 mt-1">Finish setting up your profile.</p>
+    </div>
+
+    <form id="profile-form" class="card space-y-5">
+      <div class="flex flex-col items-center mb-2">
+        <img id="picture-preview" src="" alt="" class="w-24 h-24 rounded-full object-cover border-2 border-hs-green mb-3 bg-gray-100">
+        <label class="text-sm font-medium text-gray-700">Profile Picture</label>
+        <input id="profile-picture" type="file" accept="image/*" class="mt-2 text-sm text-gray-600">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+          <input id="first-name" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+          <input id="last-name" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
+        <input id="nickname" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        <p class="text-xs text-gray-500 mt-1">If you add a nickname, the team will see this instead of your real name.</p>
+      </div>
+
+      <div id="phone-group">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+        <input id="phone" type="tel" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+      </div>
+
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input id="is-dc-employee" type="checkbox" class="h-5 w-5 accent-green-700">
+        <span class="text-sm text-gray-700">I'm a DC Employee</span>
+      </label>
+
+      <button id="save-button" type="submit" class="btn-primary w-full">Complete Setup</button>
+    </form>
+  </div>
+</body>
+</html>

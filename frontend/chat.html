@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/app.js"></script>
+  <script src="/js/chat.js"></script>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row" data-channel="general">
+  <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
+  <main class="flex-1 flex flex-col h-[calc(100vh-4rem)] md:h-screen">
+    <header class="bg-white border-b border-gray-200 px-6 py-4">
+      <h1 class="text-2xl font-bold">Team Chat</h1>
+      <p class="text-sm text-gray-500">Chat with the whole BBQ team in real time.</p>
+    </header>
+    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"></div>
+    <form id="chat-form" class="bg-white border-t border-gray-200 p-4 flex gap-3">
+      <input id="message-input" type="text" autocomplete="off" placeholder="Type a message..." class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+      <button type="submit" class="btn-primary">Send</button>
+    </form>
+  </main>
+</body>
+</html>

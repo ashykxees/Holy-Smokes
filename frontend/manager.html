@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/app.js"></script>
+  <script src="/js/manager.js"></script>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
+  <main class="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">Manager Dashboard</h1>
+      <p class="text-gray-500">Assign tasks, post announcements, and chat with other managers.</p>
+    </header>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <section class="card">
+        <h2 class="text-lg font-semibold mb-4">Task Assigner</h2>
+        <form id="task-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
+            <input id="task-title" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea id="task-description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+            <select id="task-assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+              <option value="all">Entire Team</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-primary">Assign Task</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2 class="text-lg font-semibold mb-4">Announcement Panel</h2>
+        <form id="announcement-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input id="announcement-title" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea id="announcement-content" rows="3" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700"></textarea>
+          </div>
+          <button type="submit" class="btn-primary">Post Announcement</button>
+        </form>
+      </section>
+    </div>
+
+    <section class="card mt-6" data-channel="manager">
+      <h2 class="text-lg font-semibold mb-4">Manager Chat</h2>
+      <div id="messages" class="h-80 overflow-y-auto bg-gray-50 rounded-lg p-4 space-y-3 mb-3"></div>
+      <form id="chat-form" class="flex gap-3">
+        <input id="message-input" type="text" autocomplete="off" placeholder="Manager-only message..." class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        <button type="submit" class="btn-primary">Send</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,210 @@
+let googleClientId = null;
+let currentUser = null;
+
+const QUOTES = [
+  "Good teams become great ones when the members trust each other enough to surrender the 'me' for the 'we'. – Phil Jackson",
+  "The strength of the team is each individual member. The strength of each member is the team. – Phil Jackson",
+  "Alone we can do so little; together we can do so much. – Helen Keller",
+  "Teamwork makes the dream work. – John C. Maxwell",
+  "Success is best when it's shared. – Howard Schultz",
+  "Coming together is a beginning, staying together is progress, and working together is success. – Henry Ford",
+  "If everyone is moving forward together, then success takes care of itself. – Henry Ford",
+  "None of us is as smart as all of us. – Ken Blanchard",
+  "Talent wins games, but teamwork wins championships. – Michael Jordan",
+  "It takes two flints to make a fire. – Louisa May Alcott",
+  "Unity is strength. – Aesop",
+  "A successful team is a group of many hands and one mind. – Bill Bethel",
+  "The way a team plays as a whole determines its success. – Babe Ruth",
+  "We are all in the gutter, but some of us are looking at the stars. – Oscar Wilde",
+  "Do what you can, with what you have, where you are. – Theodore Roosevelt",
+];
+
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, { credentials: 'include', ...options });
+  if (res.status === 401) {
+    if (!isAuthPage()) {
+      window.location.href = '/login.html';
+    }
+    return null;
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function isAuthPage() {
+  const path = window.location.pathname;
+  return path === '/login.html' || path === '/onboarding.html';
+}
+
+function isOnboardingPage() {
+  return window.location.pathname === '/onboarding.html';
+}
+
+async function initAuth() {
+  const loginPage = window.location.pathname === '/login.html';
+  const onboardingPage = isOnboardingPage();
+  try {
+    const user = await fetchJSON('/api/me');
+    currentUser = user;
+    if (loginPage && user) {
+      window.location.href = user.onboarding_completed ? '/' : '/onboarding.html';
+      return;
+    }
+    if (user && !user.onboarding_completed && !onboardingPage) {
+      window.location.href = '/onboarding.html';
+      return;
+    }
+    if (user && user.onboarding_completed && onboardingPage) {
+      window.location.href = '/';
+      return;
+    }
+    buildNav(user);
+    if (window.onAuthReady) window.onAuthReady(user);
+  } catch (err) {
+    if (!loginPage && !onboardingPage) {
+      window.location.href = '/login.html';
+    }
+  }
+}
+
+function buildNav(user) {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const path = window.location.pathname;
+  const linkClass = (href) => `nav-link ${path === href ? 'active' : ''}`;
+  const managerLink = user && user.is_manager
+    ? `<a href="/manager.html" class="${linkClass('/manager.html')}">
+         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+         Manager
+       </a>`
+    : '';
+  const profilePic = user && user.picture
+    ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-8 h-8 rounded-full object-cover border border-gray-200">`
+    : `<div class="w-8 h-8 rounded-full bg-hs-green text-white flex items-center justify-center text-sm font-bold">${(user.name || 'U').charAt(0).toUpperCase()}</div>`;
+  nav.innerHTML = `
+    <div class="p-6">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/logo.png" alt="Holy Smokes" class="h-12 w-auto object-contain">
+        <div>
+          <div class="font-bold text-lg tracking-tight leading-none">HOLY SMOKES</div>
+          <div class="text-xs text-gray-500 tracking-widest">BBQ TEAM</div>
+        </div>
+      </a>
+    </div>
+    <nav class="px-4 pb-4 flex-1 space-y-1">
+      <a href="/" class="${linkClass('/')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Dashboard
+      </a>
+      <a href="/chat.html" class="${linkClass('/chat.html')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat
+      </a>
+      <a href="/tasks.html" class="${linkClass('/tasks.html')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Tasks
+      </a>
+      ${managerLink}
+      <a href="/emergency.html" class="${linkClass('/emergency.html')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Emergency
+      </a>
+      <a href="/settings.html" class="${linkClass('/settings.html')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        Settings
+      </a>
+    </nav>
+    <div class="px-4 pb-4 mt-auto space-y-3">
+      <div class="flex items-center gap-3 p-2 rounded-lg border border-gray-100">
+        ${profilePic}
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium truncate">${escapeHtml(user ? user.name : 'Guest')}</div>
+          <div class="text-xs text-gray-500 truncate">${escapeHtml(user ? user.email : '')}</div>
+        </div>
+      </div>
+      <button onclick="logout()" class="btn-secondary w-full flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Log out
+      </button>
+    </div>
+  `;
+}
+
+function loadGoogleScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.accounts) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function renderGoogleButton(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!googleClientId) {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    googleClientId = cfg.google_client_id;
+  }
+  await loadGoogleScript();
+  window.google.accounts.id.initialize({
+    client_id: googleClientId,
+    callback: handleGoogleCredential,
+    ux_mode: 'popup',
+  });
+  window.google.accounts.id.renderButton(container, {
+    theme: 'outline',
+    size: 'large',
+    width: 250,
+    text: 'continue_with',
+  });
+}
+
+async function handleGoogleCredential(response) {
+  try {
+    const data = await fetchJSON('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_token: response.credential }),
+    });
+    if (!data) return;
+    if (data.onboarding_completed) {
+      window.location.href = '/';
+    } else {
+      window.location.href = '/onboarding.html';
+    }
+  } catch (err) {
+    alert(err.message || 'Login failed');
+  }
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+  window.location.href = '/login.html';
+}
+
+function randomQuote() {
+  return QUOTES[Math.floor(Math.random() * QUOTES.length)];
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+window.addEventListener('load', initAuth);

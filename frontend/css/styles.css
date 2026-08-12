@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --hs-green: #365A2F;
+  --hs-green-light: #4A7C3F;
+  --hs-black: #111111;
+  --hs-white: #ffffff;
+  --hs-gray: #f3f4f6;
+  --hs-dark-gray: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #fafafa;
+  color: var(--hs-black);
+  margin: 0;
+}
+
+.hs-green { color: var(--hs-green); }
+.bg-hs-green { background-color: var(--hs-green); }
+.border-hs-green { border-color: var(--hs-green); }
+.hover\:bg-hs-green-light:hover { background-color: var(--hs-green-light); }
+
+.btn-primary {
+  background-color: var(--hs-green);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--hs-green-light);
+}
+
+.btn-secondary {
+  background-color: white;
+  color: var(--hs-black);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--hs-gray);
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  background-color: #eff6ef;
+  color: var(--hs-green);
+}
+
+.chat-message {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.chat-message.own {
+  background-color: var(--hs-green);
+  color: white;
+  margin-left: auto;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.chat-message.other {
+  background-color: #f3f4f6;
+  color: #111827;
+  border-bottom-left-radius: 0.25rem;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+.quotes::before {
+  content: '"';
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--hs-green);
+  margin-right: 0.25rem;
+}
+
+.quotes::after {
+  content: '"';
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--hs-green);
+  margin-left: 0.25rem;
+}

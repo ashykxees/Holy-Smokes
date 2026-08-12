@@ -527,14 +527,17 @@ async def websocket_chat(websocket: WebSocket, manager: bool = False):
             app.state.connections[channel].remove(websocket)
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+
+
 @app.get("/{path:path}")
 async def serve_spa(path: str):
     # If the path has no extension, try serving the matching .html page.
     if path and "." not in os.path.basename(path):
         html_path = os.path.join(FRONTEND_DIR, path + ".html")
         if os.path.isfile(html_path):
-            return FileResponse(html_path)
+            return FileResponse(html_path, headers=_NO_CACHE)
     file_path = os.path.join(FRONTEND_DIR, path)
     if path and os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+        return FileResponse(file_path, headers=_NO_CACHE)
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), headers=_NO_CACHE)

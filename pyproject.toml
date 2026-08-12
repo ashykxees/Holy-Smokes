@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "holy-smokes"
+version = "0.1.0"
+description = "Holy Smokes BBQ team management platform"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "google-auth",
+    "python-jose[cryptography]",
+    "aiosqlite",
+    "websockets",
+    "requests",
+]

@@ -1,8 +1,6 @@
 let socket = null;
-let currentUser = null;
 
 async function onAuthReady(user) {
-  currentUser = user;
   if (!user.is_manager) {
     window.location.href = '/';
     return;
@@ -104,3 +102,5 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+window.onAuthReady = onAuthReady;

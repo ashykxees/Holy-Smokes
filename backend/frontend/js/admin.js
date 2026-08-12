@@ -54,3 +54,5 @@ async function toggleManager(email, makeManager) {
     alert(err.message);
   }
 }
+
+window.onAuthReady = onAuthReady;

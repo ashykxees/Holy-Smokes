@@ -25,3 +25,5 @@ async function onAuthReady(user) {
     list.innerHTML = `<p class="p-4 text-red-600">${escapeHtml(err.message)}</p>`;
   }
 }
+
+window.onAuthReady = onAuthReady;

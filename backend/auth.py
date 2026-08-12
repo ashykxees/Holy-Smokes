@@ -64,7 +64,7 @@ def create_session_token(user: dict) -> str:
         "is_manager": user.get("is_manager", False),
         "is_owner": user.get("is_owner", False),
         "onboarding_completed": user.get("onboarding_completed", False),
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "exp": datetime.now(timezone.utc) + timedelta(days=30),
     }
     return jwt.encode(payload, jwt_secret(), algorithm="HS256")
 

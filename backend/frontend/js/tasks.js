@@ -59,3 +59,5 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+window.onAuthReady = onAuthReady;

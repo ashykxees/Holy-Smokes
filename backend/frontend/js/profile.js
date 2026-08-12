@@ -157,3 +157,5 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
+
+window.onAuthReady = onAuthReady;

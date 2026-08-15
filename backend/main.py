@@ -16,6 +16,7 @@ try:
     from .auth import (
         create_session_token,
         get_current_user,
+        get_current_user_pending,
         get_ws_user_from_cookie,
         is_dccs_email,
         hash_password,
@@ -28,6 +29,7 @@ except ImportError:
     from auth import (
         create_session_token,
         get_current_user,
+        get_current_user_pending,
         get_ws_user_from_cookie,
         is_dccs_email,
         hash_password,
@@ -120,12 +122,13 @@ async def auth_register(request: Request):
 
     is_owner = count == 0
     is_manager = is_owner or bool(os.environ.get("OWNER_EMAIL", "").lower() == email)
+    is_approved = is_owner or is_manager
 
     await database.execute(
         """INSERT INTO users (
                email, dc_email, password_hash, name, first_name, last_name, nickname,
-               phone, is_dc_employee, picture, is_manager, is_owner, onboarding_completed, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
+               phone, is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
         (
             email,
             profile["dc_email"],
@@ -139,13 +142,14 @@ async def auth_register(request: Request):
             profile["picture"],
             int(is_manager),
             int(is_owner),
+            int(is_approved),
             db.now_iso(),
         ),
     )
     await database.commit()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -168,7 +172,7 @@ async def auth_login(request: Request):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed, password_hash
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, password_hash
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -196,7 +200,7 @@ async def logout(request: Request):
 
 
 @app.get("/api/me")
-async def me(user: dict = Depends(get_current_user)):
+async def me(user: dict = Depends(get_current_user_pending)):
     return user
 
 
@@ -281,7 +285,7 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed
            FROM users WHERE email = ?""",
         (user["email"],),
     )
@@ -298,7 +302,7 @@ async def list_users(user: dict = Depends(get_current_user)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, picture, is_manager
-           FROM users ORDER BY name"""
+           FROM users WHERE is_approved = 1 ORDER BY name"""
     )
     rows = await cursor.fetchall()
     await database.close()
@@ -445,7 +449,7 @@ async def admin_list_users(user: dict = Depends(require_owner)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_manager, is_owner, created_at
+                  is_manager, is_owner, is_approved, created_at
            FROM users ORDER BY name"""
     )
     rows = await cursor.fetchall()
@@ -470,6 +474,43 @@ async def admin_set_manager(email: str, request: Request, user: dict = Depends(r
     return {"email": target_email, "is_manager": is_manager}
 
 
+@app.get("/api/admin/pending")
+async def admin_list_pending(user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
+                  is_dc_employee, created_at
+           FROM users WHERE is_approved = 0 ORDER BY created_at DESC"""
+    )
+    rows = await cursor.fetchall()
+    await database.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/admin/users/{email}/approve")
+async def admin_approve_user(email: str, user: dict = Depends(require_manager)):
+    target_email = email.lower().strip()
+    if target_email == user["email"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="You cannot change your own approval status")
+    database = await db.get_db()
+    await database.execute("UPDATE users SET is_approved = 1 WHERE email = ?", (target_email,))
+    await database.commit()
+    await database.close()
+    return {"email": target_email, "is_approved": True}
+
+
+@app.delete("/api/admin/users/{email}")
+async def admin_delete_user(email: str, user: dict = Depends(require_manager)):
+    target_email = email.lower().strip()
+    if target_email == user["email"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account")
+    database = await db.get_db()
+    await database.execute("DELETE FROM users WHERE email = ?", (target_email,))
+    await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
 async def broadcast(message: dict, channel: str):
     dead = []
     for conn in app.state.connections.get(channel, []):
@@ -486,7 +527,7 @@ async def broadcast(message: dict, channel: str):
 async def websocket_chat(websocket: WebSocket, manager: bool = False):
     cookie = websocket.headers.get("cookie")
     try:
-        user = get_ws_user_from_cookie(cookie)
+        user = await get_ws_user_from_cookie(cookie)
     except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

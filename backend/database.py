@@ -27,6 +27,7 @@ def _schema() -> str:
             picture TEXT,
             is_manager INTEGER NOT NULL DEFAULT 0,
             is_owner INTEGER NOT NULL DEFAULT 0,
+            is_approved INTEGER NOT NULL DEFAULT 0,
             onboarding_completed INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
@@ -92,10 +93,14 @@ async def _migrate_users(db):
         ("dc_email", "TEXT"),
         ("password_hash", "TEXT"),
         ("is_owner", "INTEGER NOT NULL DEFAULT 0"),
+        ("is_approved", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col, dtype in additions:
         if col not in columns:
             await db.execute(f"ALTER TABLE users ADD COLUMN {col} {dtype}")
+
+    # Auto-approve existing owners and managers after the column is added.
+    await db.execute("UPDATE users SET is_approved = 1 WHERE is_owner = 1 OR is_manager = 1")
 
 
 def now_iso():

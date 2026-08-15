@@ -135,12 +135,12 @@ function initProfileForm(user, isOnboarding) {
     saveBtn.textContent = 'Saving...';
     try {
       const endpoint = isOnboarding ? '/api/auth/register' : '/api/profile';
-      await fetchJSON(endpoint, {
+      const data = await fetchJSON(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      window.location.href = '/dashboard';
+      window.location.href = data.is_approved ? '/dashboard' : '/awaiting';
     } catch (err) {
       alert(err.message);
       saveBtn.disabled = false;

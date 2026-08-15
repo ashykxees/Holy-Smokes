@@ -35,19 +35,39 @@ async function fetchJSON(url, options = {}) {
 
 function isAuthPage() {
   const path = window.location.pathname;
-  return path === '/login' || path === '/onboarding';
+  return path === '/login' || path === '/onboarding' || path === '/awaiting';
 }
 
 function isOnboardingPage() {
   return window.location.pathname === '/onboarding';
 }
 
+function isAwaitingPage() {
+  return window.location.pathname === '/awaiting';
+}
+
 async function initAuth() {
   const loginPage = window.location.pathname === '/login';
   const onboardingPage = isOnboardingPage();
+  const awaitingPage = isAwaitingPage();
   try {
     const user = await fetchJSON('/api/me');
     currentUser = user;
+
+    if (user && !user.is_approved) {
+      if (!awaitingPage) {
+        window.location.href = '/awaiting';
+      } else {
+        if (window.onAuthReady) window.onAuthReady(user);
+      }
+      return;
+    }
+
+    if (user && user.is_approved && awaitingPage) {
+      window.location.href = '/dashboard';
+      return;
+    }
+
     if (loginPage && user) {
       window.location.href = user.onboarding_completed ? '/dashboard' : '/onboarding';
       return;
@@ -63,7 +83,7 @@ async function initAuth() {
     buildNav(user);
     if (window.onAuthReady) window.onAuthReady(user);
   } catch (err) {
-    if (!loginPage && !onboardingPage) {
+    if (!loginPage && !onboardingPage && !awaitingPage) {
       window.location.href = '/login';
     } else if (window.onAuthReady) {
       window.onAuthReady(null);
@@ -85,6 +105,10 @@ function buildNav(user) {
        <a href="/completed" class="${linkClass('/completed')}">
          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
          Completed
+       </a>
+       <a href="/pending" class="${linkClass('/pending')}">
+         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+         Awaiting Acceptance
        </a>`
     : '';
 

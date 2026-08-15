@@ -63,6 +63,7 @@ def create_session_token(user: dict) -> str:
         "picture": user.get("picture", ""),
         "is_manager": user.get("is_manager", False),
         "is_owner": user.get("is_owner", False),
+        "is_approved": user.get("is_approved", False),
         "onboarding_completed": user.get("onboarding_completed", False),
         "exp": datetime.now(timezone.utc) + timedelta(days=30),
     }
@@ -76,7 +77,7 @@ def decode_session_token(token: str) -> dict:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid session") from exc
 
 
-async def get_current_user(request: Request) -> dict:
+async def _get_user(request: Request, require_approved: bool) -> dict:
     token = request.cookies.get("session")
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -85,7 +86,7 @@ async def get_current_user(request: Request) -> dict:
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, password_hash, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, onboarding_completed, created_at
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, created_at
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -95,7 +96,17 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
     user = dict(row)
     user.pop("password_hash", None)
+    if require_approved and not user.get("is_approved"):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Account pending approval")
     return user
+
+
+async def get_current_user(request: Request) -> dict:
+    return await _get_user(request, require_approved=True)
+
+
+async def get_current_user_pending(request: Request) -> dict:
+    return await _get_user(request, require_approved=False)
 
 
 async def require_manager(request: Request) -> dict:
@@ -112,7 +123,7 @@ async def require_owner(request: Request) -> dict:
     return user
 
 
-def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
+async def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
     if not cookie_header:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Missing session cookie")
     token = None
@@ -124,8 +135,20 @@ def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
     if not token:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Missing session cookie")
     try:
-        user = jwt.decode(token, jwt_secret(), algorithms=["HS256"])
-        user["email"] = user.get("email") or user.get("sub")
-        return user
+        payload = jwt.decode(token, jwt_secret(), algorithms=["HS256"])
+        email = payload.get("email") or payload.get("sub")
     except JWTError as exc:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid session") from exc
+
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT email, name, is_manager, is_owner, is_approved FROM users WHERE email = ?""",
+        (email,),
+    )
+    row = await cursor.fetchone()
+    await database.close()
+    if not row:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="User not found")
+    if not row["is_approved"]:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Account pending approval")
+    return dict(row)

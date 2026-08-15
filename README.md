@@ -39,7 +39,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-3. Open `http://localhost:8000` and create an account with a `@dccs.org` email.
+3. Open `http://localhost:8000` to see the public website, or go to `http://localhost:8000/login` to create an account with a `@dccs.org` email.
 
 The first registered user automatically becomes the owner and a manager.
 

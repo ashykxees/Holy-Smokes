@@ -40,7 +40,7 @@
           body: JSON.stringify({ email, password }),
         });
         if (!data) return;
-        window.location.href = data.onboarding_completed ? '/' : '/onboarding';
+        window.location.href = data.onboarding_completed ? '/dashboard' : '/onboarding';
       } catch (err) {
         alert(err.message || 'Login failed');
       }

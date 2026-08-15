@@ -3,7 +3,7 @@ const MAX_PICTURE_SIZE = 2 * 1024 * 1024;
 function onAuthReady(user) {
   const isOnboarding = window.location.pathname === '/onboarding';
   if (isOnboarding && user && user.onboarding_completed) {
-    window.location.href = '/';
+    window.location.href = '/dashboard';
     return;
   }
   if (!isOnboarding && !user) {
@@ -140,7 +140,7 @@ function initProfileForm(user, isOnboarding) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      window.location.href = '/';
+      window.location.href = '/dashboard';
     } catch (err) {
       alert(err.message);
       saveBtn.disabled = false;

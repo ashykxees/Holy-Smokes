@@ -2,7 +2,7 @@ let socket = null;
 
 async function onAuthReady(user) {
   if (!user.is_manager) {
-    window.location.href = '/';
+    window.location.href = '/dashboard';
     return;
   }
   await populateAssignees();

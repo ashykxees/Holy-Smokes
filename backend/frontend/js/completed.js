@@ -1,6 +1,6 @@
 function onAuthReady(user) {
   if (!user || !user.is_manager) {
-    window.location.href = '/';
+    window.location.href = '/dashboard';
     return;
   }
   loadCompletedTasks();

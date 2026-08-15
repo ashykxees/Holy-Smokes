@@ -1,6 +1,6 @@
 async function onAuthReady(user) {
   if (!user || !user.is_owner) {
-    window.location.href = '/';
+    window.location.href = '/dashboard';
     return;
   }
   await loadUsers();

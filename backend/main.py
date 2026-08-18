@@ -4,6 +4,7 @@ import re
 import html
 import base64
 import asyncio
+import traceback
 import urllib.request
 import urllib.error
 from urllib.parse import urlencode
@@ -742,6 +743,7 @@ async def catering_request(request: Request):
         email_sent = await _try_send_email()
     except Exception:
         # Do not fail the request if email cannot be sent; it is already saved.
+        traceback.print_exc()
         pass
 
     if email_sent:

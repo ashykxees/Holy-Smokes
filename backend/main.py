@@ -2,9 +2,11 @@ import os
 import json
 import re
 import html
+import base64
 import asyncio
 import urllib.request
 import urllib.error
+from urllib.parse import urlencode
 from contextlib import asynccontextmanager
 from email.message import EmailMessage
 
@@ -558,6 +560,37 @@ async def _send_sendgrid_email(api_key: str, from_email: str, to_email: str, sub
     return await asyncio.to_thread(_send_sendgrid_email_sync, api_key, from_email, to_email, subject, plain_body, html_body)
 
 
+def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+    data = {
+        "from": from_email,
+        "to": to_email,
+        "subject": subject,
+        "text": plain_body,
+        "html": html_body,
+    }
+    auth = base64.b64encode(f"api:{api_key}".encode("utf-8")).decode("utf-8")
+    req = urllib.request.Request(
+        f"https://api.mailgun.net/v3/{domain}/messages",
+        data=urlencode(data).encode("utf-8"),
+        headers={
+            "Authorization": f"Basic {auth}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            if resp.status >= 400:
+                raise Exception(f"Mailgun returned {resp.status}")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        raise Exception(f"Mailgun error {exc.code}: {body}") from exc
+
+
+async def _send_mailgun_email(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+    return await asyncio.to_thread(_send_mailgun_email_sync, api_key, domain, from_email, to_email, subject, plain_body, html_body)
+
+
 def _format_catering_email(data: dict) -> tuple[str, str, str]:
     safe_name = html.escape(data["name"])
     safe_phone = html.escape(data["phone"])
@@ -662,6 +695,12 @@ async def catering_request(request: Request):
             or os.environ.get("SMTP_HOST") == "smtp.sendgrid.net"
         ):
             await _send_sendgrid_email(sendgrid_key, from_email, to_email, subject, plain_body, html_body)
+            return True
+
+        mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
+        mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or os.environ.get("MAILGUN_FROM_DOMAIN")
+        if mailgun_key and mailgun_domain:
+            await _send_mailgun_email(mailgun_key, mailgun_domain, from_email, to_email, subject, plain_body, html_body)
             return True
 
         host = os.environ.get("SMTP_HOST")

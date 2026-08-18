@@ -5,3 +5,4 @@ python-jose[cryptography]
 aiosqlite
 websockets
 python-multipart
+aiosmtplib

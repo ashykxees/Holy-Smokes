@@ -1,9 +1,13 @@
+@import url('https://fonts.bunny.net/css?family=Oswald:700|Montserrat:400,500,600,700,800&display=swap');
+
 :root {
-  --hs-green: #365A2F;
-  --hs-green-light: #4A7C3F;
-  --hs-black: #111111;
-  --hs-white: #ffffff;
-  --hs-gray: #f3f4f6;
+  --hs-green: #324A2A;
+  --hs-green-light: #3E5B33;
+  --hs-forest: #263A20;
+  --hs-black: #151614;
+  --hs-white: #FFFFFF;
+  --hs-cream: #F5F3EA;
+  --hs-gray: #F5F5F0;
   --hs-dark-gray: #6b7280;
 }
 
@@ -11,16 +15,31 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #fafafa;
+  font-family: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--hs-white);
   color: var(--hs-black);
   margin: 0;
 }
 
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: 'Oswald', 'Montserrat', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .hs-green { color: var(--hs-green); }
 .bg-hs-green { background-color: var(--hs-green); }
+.bg-hs-forest { background-color: var(--hs-forest); }
+.bg-hs-black { background-color: var(--hs-black); }
 .border-hs-green { border-color: var(--hs-green); }
+.text-hs-green { color: var(--hs-green); }
+.text-hs-black { color: var(--hs-black); }
+.bg-hs-cream { background-color: var(--hs-cream); }
 .hover\:bg-hs-green-light:hover { background-color: var(--hs-green-light); }
 
 .btn-primary {
@@ -28,10 +47,11 @@ body {
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  font-family: 'Montserrat', sans-serif;
 }
 
 .btn-primary:hover {
@@ -43,7 +63,7 @@ body {
   color: var(--hs-black);
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
   border: 1px solid #e5e7eb;
   cursor: pointer;
 }
@@ -102,6 +122,13 @@ input, textarea, select {
   font-family: inherit;
 }
 
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  ring: 2px;
+  border-color: var(--hs-green);
+  box-shadow: 0 0 0 2px rgba(50, 74, 42, 0.2);
+}
+
 .quotes::before {
   content: '"';
   font-size: 1.5rem;
@@ -116,4 +143,47 @@ input, textarea, select {
   line-height: 1;
   color: var(--hs-green);
   margin-left: 0.25rem;
+}
+
+.checkmark-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: var(--hs-green);
+  fill: none;
+  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.checkmark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 2;
+  stroke: #fff;
+  stroke-miterlimit: 10;
+  margin: 0 auto;
+  box-shadow: inset 0px 0px 0px var(--hs-green);
+  animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+}
+
+.checkmark__check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+@keyframes stroke {
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes scale {
+  0%, 100% { transform: none; }
+  50% { transform: scale3d(1.1, 1.1, 1); }
+}
+
+@keyframes fill {
+  100% { box-shadow: inset 0px 0px 0px 30px var(--hs-green); }
 }

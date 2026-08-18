@@ -15,6 +15,7 @@ dependencies = [
     "aiosqlite",
     "websockets",
     "python-multipart",
+    "aiosmtplib",
 ]
 
 [tool.setuptools]

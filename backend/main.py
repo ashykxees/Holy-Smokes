@@ -1,7 +1,11 @@
 import os
 import json
 import re
+import html
 from contextlib import asynccontextmanager
+from email.message import EmailMessage
+
+import aiosmtplib
 
 import aiosqlite
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, status, Depends
@@ -508,6 +512,137 @@ async def admin_delete_user(email: str, user: dict = Depends(require_manager)):
     await database.execute("DELETE FROM users WHERE email = ?", (target_email,))
     await database.commit()
     await database.close()
+    return {"ok": True}
+
+
+_CATERING_ALLOWED_ITEMS = {
+    "Pulled Pork", "Brisket", "Ribs", "Mac n Cheese", "Special Request"
+}
+_CATERING_ALLOWED_EVENTS = {"Party", "Wedding", "Gathering", "Other"}
+
+
+def _format_catering_email(data: dict) -> tuple[str, str, str]:
+    safe_name = html.escape(data["name"])
+    safe_phone = html.escape(data["phone"])
+    safe_event = html.escape(data["event_type"])
+    safe_guests = html.escape(str(data["guests"]))
+    safe_date = html.escape(data["event_date"])
+    safe_items = ", ".join(html.escape(i) for i in data["items"])
+    safe_desc = html.escape(data.get("description", "") or "None provided")
+
+    subject = "New Catering Request"
+    html_body = f"""<html>
+<body style="font-family: Montserrat, Arial, sans-serif; color: #151614;">
+  <h2 style="color: #324A2A; text-transform: uppercase; letter-spacing: 0.05em;">New Catering Request</h2>
+  <table style="border-collapse: collapse; max-width: 600px;">
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Name</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_name}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Phone</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_phone}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Event Type</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_event}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Expected Guests</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_guests}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Event Date</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_date}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee; vertical-align: top;">Requested Items</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_items}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee; vertical-align: top;">Description &amp; Special Requests</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee; white-space: pre-wrap;">{safe_desc}</td></tr>
+  </table>
+  <p style="margin-top: 24px; color: #6b7280; font-size: 12px;">Submitted via holysmokes.cc</p>
+</body>
+</html>"""
+    plain_body = f"""New Catering Request
+
+Name: {data['name']}
+Phone: {data['phone']}
+Event Type: {data['event_type']}
+Expected Guests: {data['guests']}
+Event Date: {data['event_date']}
+Requested Items: {', '.join(data['items'])}
+Description & Special Requests:
+{data.get('description', 'None provided')}
+
+Submitted via holysmokes.cc
+"""
+    return subject, html_body, plain_body
+
+
+@app.post("/api/catering")
+async def catering_request(request: Request):
+    data = await request.json()
+    name = (data.get("name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    event_type = (data.get("event_type") or "").strip()
+    guests_raw = data.get("guests")
+    event_date = (data.get("event_date") or "").strip()
+    items = data.get("items") or []
+    description = (data.get("description") or "").strip()
+
+    if not name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Name is required")
+    if not phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Phone number is required")
+    if event_type not in _CATERING_ALLOWED_EVENTS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Select a valid event type")
+    try:
+        guests = int(guests_raw)
+        if guests < 1:
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Expected number of guests must be at least 1")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", event_date):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid event date is required")
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Select at least one requested food item")
+    if any(item not in _CATERING_ALLOWED_ITEMS for item in items):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid food item selected")
+
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    username = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASS")
+    from_email = os.environ.get("SMTP_FROM", "catering@holysmokes.cc")
+    to_email = os.environ.get("SMTP_TO", "catering@holysmokes.cc")
+
+    if not host:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email service is not configured. Set the SMTP_HOST environment variable.",
+        )
+
+    subject, html_body, plain_body = _format_catering_email({
+        "name": name,
+        "phone": phone,
+        "event_type": event_type,
+        "guests": guests,
+        "event_date": event_date,
+        "items": items,
+        "description": description,
+    })
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg["Reply-To"] = from_email
+    msg.set_content(plain_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    start_tls_env = os.environ.get("SMTP_STARTTLS", "").lower()
+    use_tls = port == 465 or start_tls_env == "tls"
+    start_tls = not use_tls and (start_tls_env in ("true", "1") or port == 587)
+
+    send_kwargs = {
+        "hostname": host,
+        "port": port,
+        "use_tls": use_tls,
+        "start_tls": start_tls,
+        "timeout": 20,
+    }
+    if username and password:
+        send_kwargs["username"] = username
+        send_kwargs["password"] = password
+
+    try:
+        await aiosmtplib.send(msg, **send_kwargs)
+    except Exception as exc:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+
     return {"ok": True}
 
 

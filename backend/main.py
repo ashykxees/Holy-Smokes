@@ -629,6 +629,19 @@ async def catering_request(request: Request):
     if any(item not in _CATERING_ALLOWED_ITEMS for item in items):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid food item selected")
 
+    items_json = json.dumps(items)
+
+    database = await db.get_db()
+    cursor = await database.execute(
+        """INSERT INTO catering_requests
+               (name, phone, event_type, guests, event_date, items, description, email_sent, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, phone, event_type, guests, event_date, items_json, description or None, 0, db.now_iso()),
+    )
+    request_id = cursor.lastrowid
+    await database.commit()
+    await database.close()
+
     from_email = os.environ.get("SMTP_FROM", "catering@holysmokes.cc")
     to_email = os.environ.get("SMTP_TO", "catering@holysmokes.cc")
 
@@ -642,53 +655,93 @@ async def catering_request(request: Request):
         "description": description,
     })
 
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SMTP_PASS")
-    if sendgrid_key and os.environ.get("SMTP_HOST") == "smtp.sendgrid.net":
-        try:
+    async def _try_send_email() -> bool:
+        sendgrid_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SMTP_PASS")
+        if sendgrid_key and (
+            os.environ.get("SENDGRID_API_KEY")
+            or os.environ.get("SMTP_HOST") == "smtp.sendgrid.net"
+        ):
             await _send_sendgrid_email(sendgrid_key, from_email, to_email, subject, plain_body, html_body)
-        except Exception as exc:
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
-        return {"ok": True}
+            return True
 
-    host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    username = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASS")
+        host = os.environ.get("SMTP_HOST")
+        port = int(os.environ.get("SMTP_PORT", "587"))
+        username = os.environ.get("SMTP_USER")
+        password = os.environ.get("SMTP_PASS")
 
-    if not host:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Email service is not configured. Set SMTP_HOST and SMTP credentials, or use SendGrid and set SMTP_HOST=smtp.sendgrid.net with the API key in SMTP_PASS.",
-        )
+        if not host:
+            return False
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = from_email
-    msg["To"] = to_email
-    msg["Reply-To"] = from_email
-    msg.set_content(plain_body)
-    msg.add_alternative(html_body, subtype="html")
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = from_email
+        msg["To"] = to_email
+        msg["Reply-To"] = from_email
+        msg.set_content(plain_body)
+        msg.add_alternative(html_body, subtype="html")
 
-    start_tls_env = os.environ.get("SMTP_STARTTLS", "").lower()
-    use_tls = port == 465 or start_tls_env == "tls"
-    start_tls = not use_tls and (start_tls_env in ("true", "1") or port == 587)
+        start_tls_env = os.environ.get("SMTP_STARTTLS", "").lower()
+        use_tls = port == 465 or start_tls_env == "tls"
+        start_tls = not use_tls and (start_tls_env in ("true", "1") or port == 587)
 
-    send_kwargs = {
-        "hostname": host,
-        "port": port,
-        "use_tls": use_tls,
-        "start_tls": start_tls,
-        "timeout": 20,
-    }
-    if username and password:
-        send_kwargs["username"] = username
-        send_kwargs["password"] = password
+        send_kwargs = {
+            "hostname": host,
+            "port": port,
+            "use_tls": use_tls,
+            "start_tls": start_tls,
+            "timeout": 20,
+        }
+        if username and password:
+            send_kwargs["username"] = username
+            send_kwargs["password"] = password
 
-    try:
         await aiosmtplib.send(msg, **send_kwargs)
-    except Exception as exc:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+        return True
 
+    email_sent = False
+    try:
+        email_sent = await _try_send_email()
+    except Exception:
+        # Do not fail the request if email cannot be sent; it is already saved.
+        pass
+
+    if email_sent:
+        database = await db.get_db()
+        await database.execute(
+            "UPDATE catering_requests SET email_sent = 1 WHERE id = ?",
+            (request_id,),
+        )
+        await database.commit()
+        await database.close()
+
+    return {"ok": True}
+
+
+@app.get("/api/catering/requests")
+async def list_catering_requests(user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT * FROM catering_requests ORDER BY created_at DESC"
+    )
+    rows = await cursor.fetchall()
+    await database.close()
+    results = []
+    for row in rows:
+        r = dict(row)
+        try:
+            r["items"] = json.loads(r["items"])
+        except Exception:
+            r["items"] = []
+        results.append(r)
+    return results
+
+
+@app.delete("/api/catering/requests/{request_id}")
+async def delete_catering_request(request_id: int, user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    await database.execute("DELETE FROM catering_requests WHERE id = ?", (request_id,))
+    await database.commit()
+    await database.close()
     return {"ok": True}
 
 

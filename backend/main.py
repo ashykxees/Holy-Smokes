@@ -2,6 +2,9 @@ import os
 import json
 import re
 import html
+import asyncio
+import urllib.request
+import urllib.error
 from contextlib import asynccontextmanager
 from email.message import EmailMessage
 
@@ -521,6 +524,40 @@ _CATERING_ALLOWED_ITEMS = {
 _CATERING_ALLOWED_EVENTS = {"Party", "Wedding", "Gathering", "Other"}
 
 
+def _send_sendgrid_email_sync(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": plain_body},
+            {"type": "text/html", "value": html_body},
+        ],
+    }
+    data_bytes = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=data_bytes,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            if resp.status >= 400:
+                raise Exception(f"SendGrid returned {resp.status}")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        raise Exception(f"SendGrid error {exc.code}: {body}") from exc
+
+
+async def _send_sendgrid_email(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+    return await asyncio.to_thread(_send_sendgrid_email_sync, api_key, from_email, to_email, subject, plain_body, html_body)
+
+
 def _format_catering_email(data: dict) -> tuple[str, str, str]:
     safe_name = html.escape(data["name"])
     safe_phone = html.escape(data["phone"])
@@ -592,18 +629,8 @@ async def catering_request(request: Request):
     if any(item not in _CATERING_ALLOWED_ITEMS for item in items):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid food item selected")
 
-    host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    username = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASS")
     from_email = os.environ.get("SMTP_FROM", "catering@holysmokes.cc")
     to_email = os.environ.get("SMTP_TO", "catering@holysmokes.cc")
-
-    if not host:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Email service is not configured. Set the SMTP_HOST environment variable.",
-        )
 
     subject, html_body, plain_body = _format_catering_email({
         "name": name,
@@ -614,6 +641,25 @@ async def catering_request(request: Request):
         "items": items,
         "description": description,
     })
+
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SMTP_PASS")
+    if sendgrid_key and os.environ.get("SMTP_HOST") == "smtp.sendgrid.net":
+        try:
+            await _send_sendgrid_email(sendgrid_key, from_email, to_email, subject, plain_body, html_body)
+        except Exception as exc:
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+        return {"ok": True}
+
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    username = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASS")
+
+    if not host:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email service is not configured. Set SMTP_HOST and SMTP credentials, or use SendGrid and set SMTP_HOST=smtp.sendgrid.net with the API key in SMTP_PASS.",
+        )
 
     msg = EmailMessage()
     msg["Subject"] = subject

@@ -5,11 +5,14 @@ import html
 import base64
 import asyncio
 import traceback
+import logging
 import urllib.request
 import urllib.error
 from urllib.parse import urlencode
 from contextlib import asynccontextmanager
 from email.message import EmailMessage
+
+logger = logging.getLogger(__name__)
 
 import aiosmtplib
 
@@ -895,6 +898,7 @@ def _parse_email_address(value: str) -> tuple[str, str]:
 async def email_inbound(request: Request):
     secret = os.environ.get("EMAIL_WEBHOOK_SECRET")
     provided = request.query_params.get("token") or request.headers.get("x-email-token")
+    logger.warning("Inbound email webhook called. token_present=%s secret_set=%s matches=%s", bool(provided), bool(secret), (not secret or provided == secret))
     if secret and provided != secret:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook token")
 
@@ -904,11 +908,14 @@ async def email_inbound(request: Request):
         if isinstance(value, str):
             data[key] = value
 
+    logger.warning("Inbound email fields: %s", json.dumps({k: v[:200] if isinstance(v, str) else v for k, v in data.items()}))
+
     to_address = (data.get("recipient") or "").strip().lower()
     from_full = (data.get("from") or data.get("sender") or "").strip()
     from_name, from_address = _parse_email_address(from_full)
     if not from_address:
         from_address = (data.get("sender") or "").strip()
+    logger.warning("Parsed inbound: to=%s from=%s name=%s", to_address, from_address, from_name)
     if not to_address or not from_address:
         return {"ok": False, "error": "Missing recipient or sender"}
 

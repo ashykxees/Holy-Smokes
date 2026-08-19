@@ -944,6 +944,109 @@ async def _send_smtp_email(from_email: str, to_email: str, subject: str, plain_b
         raise
 
 
+import requests
+
+
+def _zoho_accounts_url() -> str:
+    region = os.environ.get("ZOHO_REGION", "com")
+    return f"https://accounts.zoho.{region}/oauth/v2"
+
+
+def _zoho_mail_api_url() -> str:
+    region = os.environ.get("ZOHO_REGION", "com")
+    return f"https://mail.zoho.{region}/api/accounts"
+
+
+def _zoho_refresh_token_for_user(user: dict) -> str:
+    local = _email_local_part(user).lower()
+    prefix = local.upper()
+    return (
+        os.environ.get(f"ZOHO_{prefix}_REFRESH_TOKEN")
+        or os.environ.get("ZOHO_REFRESH_TOKEN")
+        or ""
+    )
+
+
+def _zoho_access_token(user: dict) -> str:
+    refresh = _zoho_refresh_token_for_user(user)
+    client_id = os.environ.get("ZOHO_CLIENT_ID")
+    client_secret = os.environ.get("ZOHO_CLIENT_SECRET")
+    if not refresh or not client_id or not client_secret:
+        raise Exception("Zoho OAuth not configured for this user")
+
+    url = f"{_zoho_accounts_url()}/token"
+    params = {
+        "refresh_token": refresh,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "refresh_token",
+        "scope": "ZohoMail.messages.ALL,ZohoMail.accounts.ALL",
+    }
+    resp = requests.post(url, params=params, timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f"Zoho token refresh failed: {resp.status_code} {resp.text}")
+    data = resp.json()
+    access_token = data.get("access_token")
+    if not access_token:
+        raise Exception(f"Zoho token response missing access_token: {resp.text}")
+    return access_token
+
+
+def _zoho_find_account_id(access_token: str, from_email: str) -> str:
+    url = _zoho_mail_api_url()
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    resp = requests.get(url, headers=headers, timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f"Failed to fetch Zoho accounts: {resp.status_code} {resp.text}")
+    data = resp.json()
+    accounts = data.get("data", [])
+    if not accounts:
+        raise Exception("No Zoho accounts found for this user")
+
+    from_lower = from_email.lower()
+    for account in accounts:
+        if (account.get("mailboxAddress") or "").lower() == from_lower:
+            return account["accountId"]
+        for entry in account.get("emailAddress", []):
+            if (entry.get("mailId") or "").lower() == from_lower:
+                return account["accountId"]
+
+    return accounts[0]["accountId"]
+
+
+def _send_zoho_email_api_sync(from_email: str, to_email: str, subject: str, html_body: str, access_token: str, account_id: str):
+    url = f"{_zoho_mail_api_url()}/{account_id}/messages"
+    headers = {
+        "Authorization": f"Zoho-oauthtoken {access_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "fromAddress": from_email,
+        "toAddress": to_email,
+        "subject": subject,
+        "content": html_body,
+        "mailFormat": "html",
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    if resp.status_code not in (200, 201):
+        raise Exception(f"Zoho Mail API error: {resp.status_code} {resp.text}")
+    return resp.json()
+
+
+async def _send_zoho_email_api(user: dict, from_email: str, to_email: str, subject: str, html_body: str):
+    access_token = await asyncio.to_thread(_zoho_access_token, user)
+    account_id = await asyncio.to_thread(_zoho_find_account_id, access_token, from_email)
+    await asyncio.to_thread(_send_zoho_email_api_sync, from_email, to_email, subject, html_body, access_token, account_id)
+
+
+async def _send_team_email_backend(user: dict, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
+    if _zoho_refresh_token_for_user(user):
+        await _send_zoho_email_api(user, from_email, to_email, subject, html_body)
+        return
+    await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers)
+
+
 @app.post("/api/email/send")
 async def send_team_email(request: Request, user: dict = Depends(get_current_user)):
     data = await request.json()
@@ -978,7 +1081,7 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
 {_email_signature_text(user)}"""
 
     try:
-        await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user)
+        await _send_team_email_backend(user, from_email, to_email, subject, plain_body, html_body)
     except Exception as exc:
         traceback.print_exc()
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
@@ -1161,7 +1264,7 @@ On {inbound.get('received_at')}, {inbound.get('from_name') or to_email} wrote:
         extra_headers["References"] = " ".join(refs)
 
     try:
-        await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers=extra_headers)
+        await _send_team_email_backend(user, from_email, to_email, subject, plain_body, html_body, extra_headers)
     except Exception as exc:
         await database.close()
         traceback.print_exc()

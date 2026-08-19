@@ -6,3 +6,4 @@ aiosqlite
 websockets
 python-multipart
 aiosmtplib
+requests

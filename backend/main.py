@@ -786,23 +786,21 @@ async def delete_catering_request(request_id: int, user: dict = Depends(require_
     return {"ok": True}
 
 
+def _email_first_name(user: dict) -> str:
+    name = (user.get("first_name") or user.get("nickname") or "").strip()
+    if not name:
+        full = (user.get("name") or "").strip()
+        name = full.split()[0] if full else ""
+    return name or "team"
+
+
 def _email_local_part(user: dict) -> str:
-    first = (user.get("first_name") or "").strip()
-    last = (user.get("last_name") or "").strip()
-    if first and last:
-        base = f"{first} {last}"
-    elif first:
-        base = first
-    else:
-        base = (user.get("name") or user.get("email", "").split("@")[0]).strip()
-    local = re.sub(r"[^a-zA-Z0-9.]+", ".", base).strip(".").lower()
-    if not local:
-        local = "team"
-    return local[:64]
+    local = re.sub(r"[^a-zA-Z0-9.]+", "", _email_first_name(user).lower())
+    return local[:64] or "team"
 
 
 def _email_signature_html(user: dict, public_url: str) -> str:
-    display = _display_name(user) or _email_local_part(user)
+    display = _email_first_name(user)
     logo_url = f"{public_url.rstrip('/')}/assets/logo.png"
     website = "holysmokes.cc"
     return f"""<table style="border-collapse: collapse; font-family: Montserrat, Arial, sans-serif; color: #151614;" cellpadding="0" cellspacing="0">
@@ -820,7 +818,7 @@ def _email_signature_html(user: dict, public_url: str) -> str:
 
 
 def _email_signature_text(user: dict) -> str:
-    display = _display_name(user) or _email_local_part(user)
+    display = _email_first_name(user)
     return f"""--
 {display}
 Holy Smokes BBQ Team

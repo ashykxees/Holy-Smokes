@@ -1,8 +1,7 @@
 function displayName(user) {
-  if (user.nickname) return user.nickname.trim();
-  const parts = [user.first_name, user.last_name].filter(Boolean);
-  if (parts.length) return parts.join(' ').trim();
-  return user.name || user.email.split('@')[0];
+  const first = (user.first_name || '').trim() || (user.nickname || '').trim();
+  if (first) return first;
+  return user.name ? user.name.split(' ')[0] : user.email.split('@')[0];
 }
 
 function escapeHtml(text) {

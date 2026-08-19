@@ -21,6 +21,21 @@
       opacity: 1;
       transform: translateY(0);
     }
+    .hero-slide {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 1.2s ease-in-out;
+      z-index: 0;
+    }
+    .hero-slide.active {
+      opacity: 1;
+    }
+    .hero-overlay {
+      background-color: rgba(50, 74, 42, 0.75);
+    }
   </style>
 </head>
 <body class="bg-white text-hs-black">
@@ -60,8 +75,16 @@
   </header>
 
   <!-- Hero -->
-  <section class="relative bg-hs-green text-white overflow-hidden hero-pattern">
-    <div class="max-w-6xl mx-auto px-4 py-28 md:py-40 text-center">
+  <section class="relative text-white overflow-hidden" id="hero">
+    <div class="hero-slides absolute inset-0 z-0">
+      <div class="hero-slide active" style="background-image: url('/assets/hero1.jpg')"></div>
+      <div class="hero-slide" style="background-image: url('/assets/hero2.jpg')"></div>
+      <div class="hero-slide" style="background-image: url('/assets/hero3.jpg')"></div>
+      <div class="hero-slide" style="background-image: url('/assets/hero4.jpg')"></div>
+      <div class="hero-slide" style="background-image: url('/assets/hero5.jpg')"></div>
+    </div>
+    <div class="absolute inset-0 hero-overlay z-0 hero-pattern"></div>
+    <div class="relative z-10 max-w-6xl mx-auto px-4 py-28 md:py-40 text-center">
       <p class="uppercase tracking-[0.2em] text-green-100 text-sm md:text-base mb-6 font-semibold">Delco Roots &bull; Founded 2026</p>
       <h1 class="font-display text-6xl md:text-7xl lg:text-8xl mb-4 tracking-tight">Holy Smokes</h1>
       <p class="text-xl md:text-2xl font-semibold tracking-widest uppercase mb-8 text-green-100">BBQ Team</p>
@@ -192,6 +215,21 @@
       });
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // Hero background slideshow
+    (function () {
+      const slides = document.querySelectorAll('.hero-slide');
+      if (slides.length < 2) return;
+      let current = 0;
+      function nextSlide() {
+        slides[current].classList.remove('active');
+        current = (current + 1) % slides.length;
+        slides[current].classList.add('active');
+        const delay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
+        setTimeout(nextSlide, delay);
+      }
+      setTimeout(nextSlide, Math.floor(Math.random() * 3000) + 2000);
+    })();
   </script>
 </body>
 </html>

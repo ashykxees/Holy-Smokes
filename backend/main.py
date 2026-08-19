@@ -6,6 +6,7 @@ import base64
 import asyncio
 import traceback
 import logging
+import socket
 import urllib.request
 import urllib.error
 from urllib.parse import urlencode
@@ -890,6 +891,23 @@ def _zoho_smtp_credentials(user: dict) -> dict:
     }
 
 
+def _create_ipv4_socket(host: str, port: int, timeout: float = 15):
+    """Create and connect an IPv4 socket to avoid IPv6 issues on Railway."""
+    infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+    last_exc = None
+    for family, socktype, proto, _, addr in infos:
+        sock = socket.socket(family, socktype, proto)
+        sock.settimeout(timeout)
+        try:
+            sock.connect(addr)
+            sock.setblocking(False)
+            return sock
+        except OSError as exc:
+            last_exc = exc
+            sock.close()
+    raise last_exc or OSError(f"Could not connect to {host}:{port}")
+
+
 async def _send_smtp_email(from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, user: dict, extra_headers: dict | None = None):
     creds = _zoho_smtp_credentials(user)
     if not creds["hostname"] or not creds["username"] or not creds["password"]:
@@ -906,16 +924,24 @@ async def _send_smtp_email(from_email: str, to_email: str, subject: str, plain_b
     msg.set_content(plain_body)
     msg.add_alternative(html_body, subtype="html")
 
-    await aiosmtplib.send(
-        msg,
-        hostname=creds["hostname"],
-        port=creds["port"],
-        username=creds["username"],
-        password=creds["password"],
-        use_tls=creds["use_tls"],
-        start_tls=creds["start_tls"],
-        timeout=20,
-    )
+    sock = await asyncio.to_thread(_create_ipv4_socket, creds["hostname"], creds["port"], 15)
+    try:
+        await aiosmtplib.send(
+            msg,
+            sock=sock,
+            hostname=creds["hostname"],
+            username=creds["username"],
+            password=creds["password"],
+            use_tls=creds["use_tls"],
+            start_tls=creds["start_tls"],
+            timeout=20,
+        )
+    except Exception:
+        try:
+            sock.close()
+        except OSError:
+            pass
+        raise
 
 
 @app.post("/api/email/send")

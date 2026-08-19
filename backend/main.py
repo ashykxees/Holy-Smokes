@@ -837,6 +837,87 @@ Holy Smokes BBQ Team
 holysmokes.cc"""
 
 
+def _email_outgoing_allowed(user: dict) -> bool:
+    allowed = [a.strip().lower() for a in (os.environ.get("OUTGOING_EMAIL_USERS") or "griffin,asa").split(",")]
+    local = _email_local_part(user).lower()
+    first = (user.get("first_name") or "").strip().lower()
+    email_local = (user.get("email") or "").split("@")[0].lower()
+    return local in allowed or first in allowed or email_local in allowed
+
+
+def _zoho_smtp_credentials(user: dict) -> dict:
+    local = _email_local_part(user).lower()
+    prefix = local.upper()
+    host = (
+        os.environ.get(f"ZOHO_{prefix}_SMTP_HOST")
+        or os.environ.get("ZOHO_SMTP_HOST")
+        or os.environ.get("SMTP_HOST")
+        or "smtp.zoho.com"
+    )
+    port = int(
+        os.environ.get(f"ZOHO_{prefix}_SMTP_PORT")
+        or os.environ.get("ZOHO_SMTP_PORT")
+        or os.environ.get("SMTP_PORT")
+        or "465"
+    )
+    username = (
+        os.environ.get(f"ZOHO_{prefix}_USER")
+        or os.environ.get(f"ZOHO_{prefix}_SMTP_USER")
+        or os.environ.get("ZOHO_SMTP_USER")
+        or os.environ.get("SMTP_USER")
+    )
+    password = (
+        os.environ.get(f"ZOHO_{prefix}_PASS")
+        or os.environ.get(f"ZOHO_{prefix}_SMTP_PASS")
+        or os.environ.get("ZOHO_SMTP_PASS")
+        or os.environ.get("SMTP_PASS")
+    )
+    start_tls_env = (
+        os.environ.get(f"ZOHO_{prefix}_STARTTLS")
+        or os.environ.get("ZOHO_SMTP_STARTTLS")
+        or os.environ.get("SMTP_STARTTLS")
+        or ""
+    ).lower()
+    use_tls = port == 465 or start_tls_env == "tls"
+    start_tls = not use_tls and (start_tls_env in ("true", "1") or port == 587)
+    return {
+        "hostname": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "use_tls": use_tls,
+        "start_tls": start_tls,
+    }
+
+
+async def _send_smtp_email(from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, user: dict, extra_headers: dict | None = None):
+    creds = _zoho_smtp_credentials(user)
+    if not creds["hostname"] or not creds["username"] or not creds["password"]:
+        raise Exception("SMTP credentials are not configured for this user")
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg["Reply-To"] = from_email
+    if extra_headers:
+        for key, value in extra_headers.items():
+            msg[key] = value
+    msg.set_content(plain_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    await aiosmtplib.send(
+        msg,
+        hostname=creds["hostname"],
+        port=creds["port"],
+        username=creds["username"],
+        password=creds["password"],
+        use_tls=creds["use_tls"],
+        start_tls=creds["start_tls"],
+        timeout=20,
+    )
+
+
 @app.post("/api/email/send")
 async def send_team_email(request: Request, user: dict = Depends(get_current_user)):
     data = await request.json()
@@ -850,6 +931,8 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Subject is required")
     if not body_text:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Body is required")
+    if not _email_outgoing_allowed(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not have permission to send team email")
 
     from_domain = os.environ.get("EMAIL_FROM_DOMAIN") or os.environ.get("MAILGUN_DOMAIN") or "holysmokes.cc"
     from_email = f"{_email_local_part(user)}@{from_domain}"
@@ -868,13 +951,8 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
 
 {_email_signature_text(user)}"""
 
-    mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
-    mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or from_domain
-    if not mailgun_key or not mailgun_domain:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email service is not configured")
-
     try:
-        await _send_mailgun_email(mailgun_key, mailgun_domain, from_email, to_email, subject, plain_body, html_body)
+        await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user)
     except Exception as exc:
         traceback.print_exc()
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
@@ -1002,6 +1080,9 @@ async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user))
 
 @app.post("/api/inbox/{email_id}/reply")
 async def reply_inbox_email(request: Request, email_id: int, user: dict = Depends(get_current_user)):
+    if not _email_outgoing_allowed(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not have permission to reply to team email")
+
     data = await request.json()
     reply_text = (data.get("body") or "").strip()
     if not reply_text:
@@ -1045,12 +1126,6 @@ On {inbound.get('received_at')}, {inbound.get('from_name') or to_email} wrote:
 <br><br>
 {_email_signature_html(user, public_url)}"""
 
-    mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
-    mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or from_domain
-    if not mailgun_key or not mailgun_domain:
-        await database.close()
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email service is not configured")
-
     extra_headers = {}
     if inbound.get("message_id"):
         extra_headers["In-Reply-To"] = inbound["message_id"]
@@ -1060,10 +1135,7 @@ On {inbound.get('received_at')}, {inbound.get('from_name') or to_email} wrote:
         extra_headers["References"] = " ".join(refs)
 
     try:
-        await _send_mailgun_email(
-            mailgun_key, mailgun_domain, from_email, to_email, subject,
-            plain_body, html_body, extra_headers=extra_headers,
-        )
+        await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers=extra_headers)
     except Exception as exc:
         await database.close()
         traceback.print_exc()

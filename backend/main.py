@@ -981,7 +981,7 @@ def _zoho_access_token(user: dict) -> str:
         "client_id": client_id,
         "client_secret": client_secret,
         "grant_type": "refresh_token",
-        "scope": "ZohoMail.messages.ALL,ZohoMail.accounts.ALL",
+        "scope": "ZohoMail.messages.ALL,ZohoMail.accounts.ALL,ZohoMail.folders.ALL",
     }
     resp = requests.post(url, params=params, timeout=20)
     if resp.status_code != 200:

@@ -21,7 +21,7 @@ window.onAuthReady = async (user) => {
   const name = displayName(user);
   const preview = document.getElementById('signature-preview');
   if (preview) {
-    preview.innerHTML = escapeHtml(`--\n${name}\nDelaware County Christian School\nHoly Smokes BBQ Team\nwww.holysmokes.cc`).replace(/\n/g, '<br>');
+    preview.innerHTML = escapeHtml(`--\n${name}\nHoly Smokes BBQ Team\nholysmokes.cc`).replace(/\n/g, '<br>');
   }
 
   const form = document.getElementById('email-form');

@@ -804,7 +804,7 @@ def _email_local_part(user: dict) -> str:
 def _email_signature_html(user: dict, public_url: str) -> str:
     display = _display_name(user) or _email_local_part(user)
     logo_url = f"{public_url.rstrip('/')}/assets/logo.png"
-    website = "www.holysmokes.cc"
+    website = "holysmokes.cc"
     return f"""<table style="border-collapse: collapse; font-family: Montserrat, Arial, sans-serif; color: #151614;" cellpadding="0" cellspacing="0">
   <tr>
     <td style="padding-right: 18px; vertical-align: middle;">
@@ -812,7 +812,6 @@ def _email_signature_html(user: dict, public_url: str) -> str:
     </td>
     <td style="border-left: 2px solid #324A2A; padding-left: 18px; vertical-align: middle;">
       <p style="margin: 0; font-family: Oswald, Arial, sans-serif; font-weight: bold; font-size: 18px; color: #324A2A; text-transform: uppercase; letter-spacing: 0.03em;">{html.escape(display)}</p>
-      <p style="margin: 4px 0 0 0; font-size: 14px; color: #151614;">Delaware County Christian School</p>
       <p style="margin: 4px 0 0 0; font-size: 14px; color: #151614; font-weight: bold;">Holy Smokes BBQ Team</p>
       <p style="margin: 4px 0 0 0; font-size: 14px;"><a href="https://{html.escape(website)}" style="color: #324A2A; text-decoration: none;">{html.escape(website)}</a></p>
     </td>
@@ -824,9 +823,8 @@ def _email_signature_text(user: dict) -> str:
     display = _display_name(user) or _email_local_part(user)
     return f"""--
 {display}
-Delaware County Christian School
 Holy Smokes BBQ Team
-www.holysmokes.cc"""
+holysmokes.cc"""
 
 
 @app.post("/api/email/send")

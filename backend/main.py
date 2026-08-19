@@ -786,6 +786,94 @@ async def delete_catering_request(request_id: int, user: dict = Depends(require_
     return {"ok": True}
 
 
+def _email_local_part(user: dict) -> str:
+    first = (user.get("first_name") or "").strip()
+    last = (user.get("last_name") or "").strip()
+    if first and last:
+        base = f"{first} {last}"
+    elif first:
+        base = first
+    else:
+        base = (user.get("name") or user.get("email", "").split("@")[0]).strip()
+    local = re.sub(r"[^a-zA-Z0-9.]+", ".", base).strip(".").lower()
+    if not local:
+        local = "team"
+    return local[:64]
+
+
+def _email_signature_html(user: dict, public_url: str) -> str:
+    display = _display_name(user) or _email_local_part(user)
+    logo_url = f"{public_url.rstrip('/')}/assets/logo.png"
+    website = "www.holysmokes.cc"
+    return f"""<table style="border-collapse: collapse; font-family: Montserrat, Arial, sans-serif; color: #151614;" cellpadding="0" cellspacing="0">
+  <tr>
+    <td style="padding-right: 18px; vertical-align: middle;">
+      <img src="{html.escape(logo_url)}" alt="Holy Smokes" style="height: 64px; width: auto; display: block;">
+    </td>
+    <td style="border-left: 2px solid #324A2A; padding-left: 18px; vertical-align: middle;">
+      <p style="margin: 0; font-family: Oswald, Arial, sans-serif; font-weight: bold; font-size: 18px; color: #324A2A; text-transform: uppercase; letter-spacing: 0.03em;">{html.escape(display)}</p>
+      <p style="margin: 4px 0 0 0; font-size: 14px; color: #151614;">Delaware County Christian School</p>
+      <p style="margin: 4px 0 0 0; font-size: 14px; color: #151614; font-weight: bold;">Holy Smokes BBQ Team</p>
+      <p style="margin: 4px 0 0 0; font-size: 14px;"><a href="https://{html.escape(website)}" style="color: #324A2A; text-decoration: none;">{html.escape(website)}</a></p>
+    </td>
+  </tr>
+</table>"""
+
+
+def _email_signature_text(user: dict) -> str:
+    display = _display_name(user) or _email_local_part(user)
+    return f"""--
+{display}
+Delaware County Christian School
+Holy Smokes BBQ Team
+www.holysmokes.cc"""
+
+
+@app.post("/api/email/send")
+async def send_team_email(request: Request, user: dict = Depends(get_current_user)):
+    data = await request.json()
+    to_email = (data.get("to") or "").strip()
+    subject = (data.get("subject") or "").strip()
+    body_text = (data.get("body") or "").strip()
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", to_email):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid recipient email is required")
+    if not subject:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Subject is required")
+    if not body_text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Body is required")
+
+    from_domain = os.environ.get("EMAIL_FROM_DOMAIN") or os.environ.get("MAILGUN_DOMAIN") or "holysmokes.cc"
+    from_email = f"{_email_local_part(user)}@{from_domain}"
+
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.hostname
+    public_url = os.environ.get("PUBLIC_URL", f"{scheme}://{host}").rstrip("/")
+
+    escaped_body = html.escape(body_text).replace("\n", "<br>")
+    html_body = f"""<div style="font-family: Montserrat, Arial, sans-serif; color: #151614; line-height: 1.6;">
+{escaped_body}
+</div>
+<br><br>
+{_email_signature_html(user, public_url)}"""
+    plain_body = f"""{body_text}
+
+{_email_signature_text(user)}"""
+
+    mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
+    mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or from_domain
+    if not mailgun_key or not mailgun_domain:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email service is not configured")
+
+    try:
+        await _send_mailgun_email(mailgun_key, mailgun_domain, from_email, to_email, subject, plain_body, html_body)
+    except Exception as exc:
+        traceback.print_exc()
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+
+    return {"ok": True}
+
+
 async def broadcast(message: dict, channel: str):
     dead = []
     for conn in app.state.connections.get(channel, []):

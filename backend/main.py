@@ -561,7 +561,7 @@ async def _send_sendgrid_email(api_key: str, from_email: str, to_email: str, sub
     return await asyncio.to_thread(_send_sendgrid_email_sync, api_key, from_email, to_email, subject, plain_body, html_body)
 
 
-def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
     data = {
         "from": from_email,
         "to": to_email,
@@ -569,6 +569,9 @@ def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_emai
         "text": plain_body,
         "html": html_body,
     }
+    if extra_headers:
+        for key, value in extra_headers.items():
+            data[f"h:{key}"] = value
     auth = base64.b64encode(f"api:{api_key}".encode("utf-8")).decode("utf-8")
     req = urllib.request.Request(
         f"https://api.mailgun.net/v3/{domain}/messages",
@@ -588,8 +591,8 @@ def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_emai
         raise Exception(f"Mailgun error {exc.code}: {body}") from exc
 
 
-async def _send_mailgun_email(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
-    return await asyncio.to_thread(_send_mailgun_email_sync, api_key, domain, from_email, to_email, subject, plain_body, html_body)
+async def _send_mailgun_email(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
+    return await asyncio.to_thread(_send_mailgun_email_sync, api_key, domain, from_email, to_email, subject, plain_body, html_body, extra_headers)
 
 
 def _format_catering_email(data: dict) -> tuple[str, str, str]:
@@ -799,6 +802,12 @@ def _email_local_part(user: dict) -> str:
     return local[:64] or "team"
 
 
+def _public_url_from_request(request: Request) -> str:
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.hostname
+    return os.environ.get("PUBLIC_URL", f"{scheme}://{host}").rstrip("/")
+
+
 def _email_signature_html(user: dict, public_url: str) -> str:
     display = _email_first_name(user)
     logo_url = f"{public_url.rstrip('/')}/assets/logo.png"
@@ -867,6 +876,209 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
         traceback.print_exc()
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
 
+    return {"ok": True}
+
+
+def _parse_email_address(value: str) -> tuple[str, str]:
+    value = (value or "").strip()
+    if not value:
+        return ("", "")
+    match = re.match(r"^\s*\"?([^\"<>]+)\"?\s*<([^>]+)>\s*$", value)
+    if match:
+        name = match.group(1).strip()
+        email = match.group(2).strip()
+        return (name, email)
+    return ("", value)
+
+
+@app.post("/api/email/inbound")
+async def email_inbound(request: Request):
+    secret = os.environ.get("EMAIL_WEBHOOK_SECRET")
+    provided = request.query_params.get("token") or request.headers.get("x-email-token")
+    if secret and provided != secret:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook token")
+
+    form = await request.form()
+    data = {}
+    for key, value in form.multi_items():
+        if isinstance(value, str):
+            data[key] = value
+
+    to_address = (data.get("recipient") or "").strip().lower()
+    from_full = (data.get("from") or data.get("sender") or "").strip()
+    from_name, from_address = _parse_email_address(from_full)
+    if not from_address:
+        from_address = (data.get("sender") or "").strip()
+    if not to_address or not from_address:
+        return {"ok": False, "error": "Missing recipient or sender"}
+
+    subject = (data.get("subject") or "").strip()
+    body_text = (
+        data.get("stripped-text")
+        or data.get("stripped_text")
+        or data.get("body-plain")
+        or data.get("body_plain")
+        or data.get("body")
+        or ""
+    )
+    body_html = (
+        data.get("stripped-html")
+        or data.get("stripped_html")
+        or data.get("body-html")
+        or data.get("body_html")
+        or ""
+    )
+
+    message_id = data.get("Message-Id") or data.get("Message-ID") or data.get("message-id")
+    in_reply_to = data.get("In-Reply-To") or data.get("in-reply-to")
+    references = data.get("References") or data.get("references")
+
+    database = await db.get_db()
+    await database.execute(
+        """INSERT INTO inbound_emails
+           (message_id, in_reply_to, references_list, to_address, from_address, from_name,
+            subject, body_text, body_html, raw_data, received_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            message_id,
+            in_reply_to,
+            references,
+            to_address,
+            from_address,
+            from_name,
+            subject,
+            body_text,
+            body_html,
+            json.dumps(data),
+            db.now_iso(),
+        ),
+    )
+    await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
+@app.get("/api/inbox")
+async def list_inbox(user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT * FROM inbound_emails ORDER BY received_at DESC"
+    )
+    rows = await cursor.fetchall()
+    results = []
+    for row in rows:
+        r = dict(row)
+        text = (r.get("body_text") or "").replace("\n", " ")
+        r["snippet"] = text[:140]
+        results.append(r)
+    await database.close()
+    return results
+
+
+@app.get("/api/inbox/{email_id}")
+async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute("SELECT * FROM inbound_emails WHERE id = ?", (email_id,))
+    row = await cursor.fetchone()
+    if not row:
+        await database.close()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Email not found")
+    email = dict(row)
+    cursor = await database.execute(
+        "SELECT * FROM email_replies WHERE inbound_email_id = ? ORDER BY sent_at ASC",
+        (email_id,),
+    )
+    email["replies"] = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return email
+
+
+@app.post("/api/inbox/{email_id}/reply")
+async def reply_inbox_email(request: Request, email_id: int, user: dict = Depends(get_current_user)):
+    data = await request.json()
+    reply_text = (data.get("body") or "").strip()
+    if not reply_text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Reply body is required")
+
+    database = await db.get_db()
+    cursor = await database.execute("SELECT * FROM inbound_emails WHERE id = ?", (email_id,))
+    row = await cursor.fetchone()
+    if not row:
+        await database.close()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Email not found")
+    inbound = dict(row)
+
+    from_domain = os.environ.get("EMAIL_FROM_DOMAIN") or os.environ.get("MAILGUN_DOMAIN") or "holysmokes.cc"
+    from_email = f"{_email_local_part(user)}@{from_domain}"
+    to_email = inbound["from_address"]
+    subject = inbound["subject"]
+    if subject and not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+
+    quote_text = (inbound.get("body_text") or "").strip()
+    quoted = "\n".join(f"> {line}" for line in quote_text.splitlines())
+    quoted_html = html.escape(quote_text).replace("\n", "<br>")
+    reply_escaped = html.escape(reply_text).replace("\n", "<br>")
+    public_url = _public_url_from_request(request)
+
+    plain_body = f"""{reply_text}
+
+On {inbound.get('received_at')}, {inbound.get('from_name') or to_email} wrote:
+{quoted}
+
+{_email_signature_text(user)}"""
+
+    html_body = f"""<div style="font-family: Montserrat, Arial, sans-serif; color: #151614; line-height: 1.6;">
+{reply_escaped}
+</div>
+<div style="border-left: 2px solid #cccccc; margin: 16px 0 0 0; padding: 0 0 0 12px; color: #555555;">
+  <p style="margin: 0 0 8px 0;">On {html.escape(inbound.get('received_at') or '')}, {html.escape(inbound.get('from_name') or to_email)} wrote:</p>
+  <div>{quoted_html}</div>
+</div>
+<br><br>
+{_email_signature_html(user, public_url)}"""
+
+    mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
+    mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or from_domain
+    if not mailgun_key or not mailgun_domain:
+        await database.close()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email service is not configured")
+
+    extra_headers = {}
+    if inbound.get("message_id"):
+        extra_headers["In-Reply-To"] = inbound["message_id"]
+        refs = [inbound["message_id"]]
+        if inbound.get("references_list"):
+            refs.insert(0, inbound["references_list"])
+        extra_headers["References"] = " ".join(refs)
+
+    try:
+        await _send_mailgun_email(
+            mailgun_key, mailgun_domain, from_email, to_email, subject,
+            plain_body, html_body, extra_headers=extra_headers,
+        )
+    except Exception as exc:
+        await database.close()
+        traceback.print_exc()
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send reply: {exc}") from exc
+
+    await database.execute(
+        """INSERT INTO email_replies
+           (inbound_email_id, sender_email, to_address, subject, body_text, body_html, sent_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (
+            email_id,
+            user["email"],
+            to_email,
+            subject,
+            reply_text,
+            html_body,
+            db.now_iso(),
+        ),
+    )
+    await database.execute("UPDATE inbound_emails SET replied = 1 WHERE id = ?", (email_id,))
+    await database.commit()
+    await database.close()
     return {"ok": True}
 
 

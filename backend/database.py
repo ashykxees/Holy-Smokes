@@ -74,6 +74,34 @@ def _schema() -> str:
             email_sent INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS inbound_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id TEXT,
+            in_reply_to TEXT,
+            references_list TEXT,
+            to_address TEXT NOT NULL,
+            from_address TEXT NOT NULL,
+            from_name TEXT,
+            subject TEXT NOT NULL,
+            body_text TEXT,
+            body_html TEXT,
+            raw_data TEXT,
+            received_at TEXT NOT NULL,
+            replied INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS email_replies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            inbound_email_id INTEGER NOT NULL,
+            sender_email TEXT NOT NULL,
+            to_address TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body_text TEXT,
+            body_html TEXT,
+            sent_at TEXT NOT NULL,
+            FOREIGN KEY (inbound_email_id) REFERENCES inbound_emails(id) ON DELETE CASCADE
+        );
     """
 
 

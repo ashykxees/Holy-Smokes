@@ -9,6 +9,7 @@ import logging
 import socket
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 from contextlib import asynccontextmanager
 from email.message import EmailMessage
@@ -1047,6 +1048,123 @@ async def _send_team_email_backend(user: dict, from_email: str, to_email: str, s
     await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers)
 
 
+def _zoho_user_email(user: dict) -> str:
+    from_domain = os.environ.get("EMAIL_FROM_DOMAIN") or os.environ.get("MAILGUN_DOMAIN") or "holysmokes.cc"
+    return f"{_email_local_part(user)}@{from_domain}"
+
+
+def _zoho_inbox_folder_id(access_token: str, account_id: str) -> str:
+    url = f"{_zoho_mail_api_url()}/{account_id}/folders"
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    resp = requests.get(url, headers=headers, timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f"Failed to fetch Zoho folders: {resp.status_code} {resp.text}")
+    data = resp.json()
+    for folder in data.get("data", []):
+        if folder.get("folderName") == "Inbox":
+            return folder["folderId"]
+    raise Exception("Inbox folder not found")
+
+
+def _zoho_fetch_message_content(access_token: str, account_id: str, folder_id: str, message_id: str) -> str:
+    url = f"{_zoho_mail_api_url()}/{account_id}/folders/{folder_id}/messages/{message_id}/content"
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    resp = requests.get(url, headers=headers, params={"includeBlockContent": "true"}, timeout=20)
+    if resp.status_code != 200:
+        return ""
+    data = resp.json()
+    return data.get("data", {}).get("content") or ""
+
+
+def _zoho_ms_to_iso(value) -> str:
+    try:
+        ts = int(value) / 1000
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    except (ValueError, TypeError):
+        return datetime.now(timezone.utc).isoformat()
+
+
+def _zoho_strip_html_to_text(raw_html: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", raw_html or "")
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
+    refresh = _zoho_refresh_token_for_user(user)
+    if not refresh:
+        return 0
+    access_token = _zoho_access_token(user)
+    user_email = _zoho_user_email(user)
+    account_id = _zoho_find_account_id(access_token, user_email)
+    folder_id = _zoho_inbox_folder_id(access_token, account_id)
+
+    url = f"{_zoho_mail_api_url()}/{account_id}/messages/view"
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    params = {"folderId": folder_id, "limit": 50, "sortBy": "date", "sortorder": "false"}
+    resp = requests.get(url, headers=headers, params=params, timeout=30)
+    if resp.status_code != 200:
+        raise Exception(f"Failed to list Zoho messages: {resp.status_code} {resp.text}")
+    data = resp.json()
+    messages = data.get("data", [])
+
+    database = await db.get_db()
+    try:
+        added = 0
+        for msg in messages:
+            zoho_id = str(msg.get("messageId"))
+            if not zoho_id:
+                continue
+            cursor = await database.execute("SELECT id FROM inbound_emails WHERE message_id = ?", (zoho_id,))
+            existing = await cursor.fetchone()
+            if existing:
+                continue
+            content = _zoho_fetch_message_content(access_token, account_id, folder_id, zoho_id)
+            from_full = msg.get("fromAddress") or ""
+            from_name, from_address = _parse_email_address(from_full) if "<" in from_full else (msg.get("sender") or "", from_full)
+            if not from_address:
+                from_address = from_full
+            to_full = msg.get("toAddress") or user_email
+            _, to_address = _parse_email_address(to_full) if "<" in to_full else ("", to_full)
+            body_text = _zoho_strip_html_to_text(content)
+            await database.execute(
+                """INSERT INTO inbound_emails
+                   (message_id, in_reply_to, references_list, to_address, from_address, from_name,
+                    subject, body_text, body_html, raw_data, received_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    zoho_id,
+                    None,
+                    None,
+                    to_address,
+                    from_address,
+                    from_name,
+                    msg.get("subject") or "",
+                    body_text,
+                    content,
+                    json.dumps(msg),
+                    _zoho_ms_to_iso(msg.get("receivedTime") or msg.get("sentDateInGMT")),
+                ),
+            )
+            added += 1
+        await database.commit()
+        return added
+    finally:
+        await database.close()
+
+
+def _zoho_sync_inbox_for_user_sync(user: dict) -> int:
+    return asyncio.run(_zoho_sync_inbox_for_user_async(user))
+
+
+async def _sync_zoho_inbox(user: dict):
+    try:
+        return await asyncio.to_thread(_zoho_sync_inbox_for_user_sync, user)
+    except Exception as exc:
+        logger.warning("Zoho inbox sync failed for %s: %s", user.get("email"), exc)
+        return 0
+
+
 @app.post("/api/email/send")
 async def send_team_email(request: Request, user: dict = Depends(get_current_user)):
     data = await request.json()
@@ -1174,6 +1292,9 @@ async def email_inbound(request: Request):
 
 @app.get("/api/inbox")
 async def list_inbox(user: dict = Depends(get_current_user)):
+    # Sync latest messages from the user's Zoho mailbox if configured.
+    await _sync_zoho_inbox(user)
+
     database = await db.get_db()
     cursor = await database.execute(
         "SELECT * FROM inbound_emails ORDER BY received_at DESC"

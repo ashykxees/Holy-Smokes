@@ -1165,6 +1165,11 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
                 ),
             )
             added += 1
+            if thread_id:
+                await database.execute(
+                    "UPDATE inbound_emails SET archived = 0 WHERE thread_id = ? AND archived = 1",
+                    (thread_id,),
+                )
         await database.commit()
         return added
     finally:

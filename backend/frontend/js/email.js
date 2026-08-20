@@ -87,7 +87,7 @@ async function loadInbox(archived = false) {
           <span class="font-semibold text-sm">${escapeHtml(e.from_name || e.from_address)}</span>
           <span class="text-xs text-gray-500">${formatTime(e.received_at)}</span>
         </div>
-        <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(e.subject)}</div>
+        <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(e.subject)}${e.is_read ? '' : '<span class="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>'}</div>
         <div class="text-xs text-gray-500 truncate">${escapeHtml(e.snippet || '')}</div>
       </li>
     `).join('');
@@ -108,22 +108,43 @@ async function loadEmail(id) {
     document.getElementById('detail-from').textContent = `From: ${email.from_name ? `${email.from_name} <${email.from_address}>` : email.from_address}`;
     document.getElementById('detail-to').textContent = `To: ${email.to_address}`;
     document.getElementById('detail-time').textContent = formatTime(email.received_at);
-    document.getElementById('detail-body').textContent = email.body_text || '(No message body)';
 
     const archiveBtn = document.getElementById('archive-btn');
     archiveBtn.textContent = email.archived ? 'Unarchive' : 'Archive';
     archiveBtn.disabled = false;
 
+    const detailBody = document.getElementById('detail-body');
+    const threadList = document.getElementById('thread-list');
     const repliesList = document.getElementById('replies-list');
-    if (email.replies && email.replies.length) {
-      repliesList.innerHTML = email.replies.map(r => `
+
+    if (email.thread && email.thread.length) {
+      detailBody.classList.add('hidden');
+      threadList.classList.remove('hidden');
+      repliesList.classList.add('hidden');
+      threadList.innerHTML = email.thread.map(t => `
         <div class="card bg-gray-50">
-          <div class="text-xs text-gray-500 mb-1">${formatTime(r.sent_at)}</div>
-          <div class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(r.body_text || '')}</div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold">${escapeHtml(t.from_name || t.from_address || 'You')}</span>
+            <span class="text-xs text-gray-500">${formatTime(t.time)}</span>
+          </div>
+          <div class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(t.body_text || '')}</div>
         </div>
       `).join('');
     } else {
-      repliesList.innerHTML = '';
+      detailBody.classList.remove('hidden');
+      threadList.classList.add('hidden');
+      repliesList.classList.remove('hidden');
+      detailBody.textContent = email.body_text || '(No message body)';
+      if (email.replies && email.replies.length) {
+        repliesList.innerHTML = email.replies.map(r => `
+          <div class="card bg-gray-50">
+            <div class="text-xs text-gray-500 mb-1">${formatTime(r.sent_at)}</div>
+            <div class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(r.body_text || '')}</div>
+          </div>
+        `).join('');
+      } else {
+        repliesList.innerHTML = '';
+      }
     }
 
     showInboxDetail();

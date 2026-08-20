@@ -1090,6 +1090,16 @@ def _zoho_strip_html_to_text(raw_html: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _zoho_is_read(msg: dict) -> bool:
+    status = msg.get("status")
+    if isinstance(status, str):
+        return status.lower() == "read"
+    status2 = msg.get("status2")
+    if status2 in (1, "1", True, "read"):
+        return True
+    return False
+
+
 async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
     refresh = _zoho_refresh_token_for_user(user)
     if not refresh:
@@ -1115,9 +1125,15 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
             zoho_id = str(msg.get("messageId"))
             if not zoho_id:
                 continue
+            is_read = _zoho_is_read(msg)
+            thread_id = str(msg.get("threadId") or "")
             cursor = await database.execute("SELECT id FROM inbound_emails WHERE message_id = ?", (zoho_id,))
             existing = await cursor.fetchone()
             if existing:
+                await database.execute(
+                    "UPDATE inbound_emails SET is_read = ?, thread_id = ? WHERE message_id = ?",
+                    (1 if is_read else 0, thread_id or None, zoho_id),
+                )
                 continue
             content = _zoho_fetch_message_content(access_token, account_id, folder_id, zoho_id)
             from_full = msg.get("fromAddress") or ""
@@ -1130,8 +1146,8 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
             await database.execute(
                 """INSERT INTO inbound_emails
                    (message_id, in_reply_to, references_list, to_address, from_address, from_name,
-                    subject, body_text, body_html, raw_data, received_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    subject, body_text, body_html, raw_data, received_at, thread_id, is_read)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     zoho_id,
                     None,
@@ -1144,6 +1160,8 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
                     content,
                     json.dumps(msg),
                     _zoho_ms_to_iso(msg.get("receivedTime") or msg.get("sentDateInGMT")),
+                    thread_id or None,
+                    1 if is_read else 0,
                 ),
             )
             added += 1
@@ -1311,6 +1329,24 @@ async def list_inbox(user: dict = Depends(get_current_user), archived: bool = Fa
     return results
 
 
+def _zoho_mark_read_sync(user: dict, message_id: str, account_email: str):
+    refresh = _zoho_refresh_token_for_user(user)
+    if not refresh:
+        return
+    access_token = _zoho_access_token(user)
+    account_id = _zoho_find_account_id(access_token, account_email)
+    url = f"{_zoho_mail_api_url()}/{account_id}/updatemessage"
+    headers = {
+        "Authorization": f"Zoho-oauthtoken {access_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    payload = {"mode": "markAsRead", "messageId": [int(message_id)]}
+    resp = requests.put(url, headers=headers, json=payload, timeout=20)
+    if resp.status_code not in (200, 201, 204):
+        raise Exception(f"Zoho mark read failed: {resp.status_code} {resp.text}")
+
+
 @app.get("/api/inbox/{email_id}")
 async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user)):
     database = await db.get_db()
@@ -1320,11 +1356,47 @@ async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user))
         await database.close()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Email not found")
     email = dict(row)
+
+    if not email.get("is_read"):
+        await database.execute("UPDATE inbound_emails SET is_read = 1 WHERE id = ?", (email_id,))
+        await database.commit()
+        if _zoho_refresh_token_for_user(user) and str(email.get("message_id") or "").isdigit():
+            try:
+                await asyncio.to_thread(_zoho_mark_read_sync, user, email["message_id"], email.get("to_address") or _zoho_user_email(user))
+            except Exception as exc:
+                logger.warning("Failed to mark Zoho message as read: %s", exc)
+
+    thread_emails = []
+    if email.get("thread_id"):
+        cursor = await database.execute(
+            "SELECT * FROM inbound_emails WHERE thread_id = ? AND id != ? ORDER BY received_at ASC",
+            (email["thread_id"], email_id),
+        )
+        thread_emails = [dict(r) for r in await cursor.fetchall()]
+
+    thread_ids = [email_id] + [e["id"] for e in thread_emails]
+    placeholders = ",".join("?" * len(thread_ids))
     cursor = await database.execute(
-        "SELECT * FROM email_replies WHERE inbound_email_id = ? ORDER BY sent_at ASC",
-        (email_id,),
+        f"SELECT * FROM email_replies WHERE inbound_email_id IN ({placeholders}) ORDER BY sent_at ASC",
+        thread_ids,
     )
-    email["replies"] = [dict(r) for r in await cursor.fetchall()]
+    replies = [dict(r) for r in await cursor.fetchall()]
+
+    def _thread_entry(entry, is_reply=False):
+        return {
+            "id": entry["id"],
+            "type": "reply" if is_reply else "inbound",
+            "from_name": entry.get("from_name") or "",
+            "from_address": entry.get("from_address") or entry.get("sender_email") or "",
+            "body_text": entry.get("body_text") or "",
+            "time": entry.get("received_at") or entry.get("sent_at"),
+        }
+
+    thread = [_thread_entry(e) for e in thread_emails] + [_thread_entry(e, True) for e in replies]
+    thread.append(_thread_entry(email))
+    thread.sort(key=lambda x: x["time"] or "")
+    email["thread"] = thread
+
     await database.close()
     return email
 

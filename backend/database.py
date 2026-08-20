@@ -89,7 +89,9 @@ def _schema() -> str:
             raw_data TEXT,
             received_at TEXT NOT NULL,
             replied INTEGER NOT NULL DEFAULT 0,
-            archived INTEGER NOT NULL DEFAULT 0
+            archived INTEGER NOT NULL DEFAULT 0,
+            thread_id TEXT,
+            is_read INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS email_replies (
@@ -152,6 +154,8 @@ async def _migrate_inbound_emails(db):
         columns = {row["name"] for row in await cursor.fetchall()}
     additions = [
         ("archived", "INTEGER NOT NULL DEFAULT 0"),
+        ("thread_id", "TEXT"),
+        ("is_read", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col, dtype in additions:
         if col not in columns:

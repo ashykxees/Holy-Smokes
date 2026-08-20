@@ -1291,13 +1291,14 @@ async def email_inbound(request: Request):
 
 
 @app.get("/api/inbox")
-async def list_inbox(user: dict = Depends(get_current_user)):
+async def list_inbox(user: dict = Depends(get_current_user), archived: bool = False):
     # Sync latest messages from the user's Zoho mailbox if configured.
     await _sync_zoho_inbox(user)
 
     database = await db.get_db()
     cursor = await database.execute(
-        "SELECT * FROM inbound_emails ORDER BY received_at DESC"
+        "SELECT * FROM inbound_emails WHERE archived = ? ORDER BY received_at DESC",
+        (1 if archived else 0,),
     )
     rows = await cursor.fetchall()
     results = []
@@ -1326,6 +1327,21 @@ async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user))
     email["replies"] = [dict(r) for r in await cursor.fetchall()]
     await database.close()
     return email
+
+
+@app.post("/api/inbox/{email_id}/archive")
+async def toggle_archive_email(email_id: int, user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute("SELECT archived FROM inbound_emails WHERE id = ?", (email_id,))
+    row = await cursor.fetchone()
+    if not row:
+        await database.close()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Email not found")
+    new_status = 0 if row["archived"] else 1
+    await database.execute("UPDATE inbound_emails SET archived = ? WHERE id = ?", (new_status, email_id))
+    await database.commit()
+    await database.close()
+    return {"ok": True, "archived": bool(new_status)}
 
 
 @app.post("/api/inbox/{email_id}/reply")

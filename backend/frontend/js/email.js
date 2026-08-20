@@ -21,25 +21,35 @@ function formatTime(iso) {
 
 let currentUser = null;
 let currentEmailId = null;
+let currentTab = 'inbox';
 
 function setTab(tab) {
+  currentTab = tab;
   const inboxPanel = document.getElementById('inbox-panel');
   const composePanel = document.getElementById('compose-panel');
   const inboxBtn = document.getElementById('tab-inbox');
+  const archivedBtn = document.getElementById('tab-archived');
   const composeBtn = document.getElementById('tab-compose');
+
+  [inboxBtn, archivedBtn, composeBtn].forEach(btn => {
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+  });
 
   if (tab === 'compose') {
     inboxPanel.classList.add('hidden');
     composePanel.classList.remove('hidden');
-    inboxBtn.classList.replace('btn-primary', 'btn-secondary');
     composeBtn.classList.replace('btn-secondary', 'btn-primary');
     updateSignaturePreview();
   } else {
     composePanel.classList.add('hidden');
     inboxPanel.classList.remove('hidden');
-    composeBtn.classList.replace('btn-primary', 'btn-secondary');
-    inboxBtn.classList.replace('btn-secondary', 'btn-primary');
-    loadInbox();
+    if (tab === 'inbox') {
+      inboxBtn.classList.replace('btn-secondary', 'btn-primary');
+    } else if (tab === 'archived') {
+      archivedBtn.classList.replace('btn-secondary', 'btn-primary');
+    }
+    loadInbox(tab === 'archived');
   }
 }
 
@@ -62,12 +72,13 @@ function showInboxDetail() {
   document.getElementById('inbox-detail').classList.remove('hidden');
 }
 
-async function loadInbox() {
+async function loadInbox(archived = false) {
   const list = document.getElementById('emails-list');
   try {
-    const emails = await fetchJSON('/api/inbox');
+    const url = archived ? '/api/inbox?archived=1' : '/api/inbox';
+    const emails = await fetchJSON(url);
     if (!emails || emails.length === 0) {
-      list.innerHTML = '<li class="text-gray-500 text-sm">No messages yet.</li>';
+      list.innerHTML = `<li class="text-gray-500 text-sm">No ${archived ? 'archived ' : ''}messages yet.</li>`;
       return;
     }
     list.innerHTML = emails.map(e => `
@@ -99,6 +110,10 @@ async function loadEmail(id) {
     document.getElementById('detail-time').textContent = formatTime(email.received_at);
     document.getElementById('detail-body').textContent = email.body_text || '(No message body)';
 
+    const archiveBtn = document.getElementById('archive-btn');
+    archiveBtn.textContent = email.archived ? 'Unarchive' : 'Archive';
+    archiveBtn.disabled = false;
+
     const repliesList = document.getElementById('replies-list');
     if (email.replies && email.replies.length) {
       repliesList.innerHTML = email.replies.map(r => `
@@ -114,6 +129,23 @@ async function loadEmail(id) {
     showInboxDetail();
   } catch (err) {
     alert(`Failed to load email: ${err.message}`);
+  }
+}
+
+async function toggleArchive() {
+  if (!currentEmailId) return;
+  const archiveBtn = document.getElementById('archive-btn');
+  const previousLabel = archiveBtn.textContent;
+  archiveBtn.disabled = true;
+  archiveBtn.textContent = 'Saving...';
+  try {
+    await fetchJSON(`/api/inbox/${currentEmailId}/archive`, { method: 'POST' });
+    showInboxList();
+    setTab(currentTab);
+  } catch (err) {
+    alert(`Failed to update archive status: ${err.message}`);
+    archiveBtn.disabled = false;
+    archiveBtn.textContent = previousLabel;
   }
 }
 
@@ -180,16 +212,20 @@ window.onAuthReady = async (user) => {
   currentUser = user;
 
   document.getElementById('tab-inbox').addEventListener('click', () => setTab('inbox'));
+  document.getElementById('tab-archived').addEventListener('click', () => setTab('archived'));
   document.getElementById('tab-compose').addEventListener('click', () => setTab('compose'));
   document.getElementById('back-to-inbox-list').addEventListener('click', showInboxList);
   document.getElementById('reply-form').addEventListener('submit', sendReply);
   document.getElementById('compose-form').addEventListener('submit', sendCompose);
+  document.getElementById('archive-btn').addEventListener('click', toggleArchive);
 
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
   const path = window.location.pathname;
-  if (tab === 'compose' || path === '/email') {
+  if (tab === 'compose') {
     setTab('compose');
+  } else if (tab === 'archived') {
+    setTab('archived');
   } else {
     setTab('inbox');
   }

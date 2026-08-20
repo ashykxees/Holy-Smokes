@@ -88,7 +88,8 @@ def _schema() -> str:
             body_html TEXT,
             raw_data TEXT,
             received_at TEXT NOT NULL,
-            replied INTEGER NOT NULL DEFAULT 0
+            replied INTEGER NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS email_replies (
@@ -116,6 +117,7 @@ async def init_db():
     db = await get_db()
     await db.executescript(_schema())
     await _migrate_users(db)
+    await _migrate_inbound_emails(db)
     await db.commit()
     await db.close()
 
@@ -142,6 +144,18 @@ async def _migrate_users(db):
 
     # Auto-approve existing owners and managers after the column is added.
     await db.execute("UPDATE users SET is_approved = 1 WHERE is_owner = 1 OR is_manager = 1")
+
+
+async def _migrate_inbound_emails(db):
+    """Add columns introduced to inbound_emails after the initial deploy."""
+    async with db.execute("PRAGMA table_info(inbound_emails)") as cursor:
+        columns = {row["name"] for row in await cursor.fetchall()}
+    additions = [
+        ("archived", "INTEGER NOT NULL DEFAULT 0"),
+    ]
+    for col, dtype in additions:
+        if col not in columns:
+            await db.execute(f"ALTER TABLE inbound_emails ADD COLUMN {col} {dtype}")
 
 
 def now_iso():

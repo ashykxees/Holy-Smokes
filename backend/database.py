@@ -161,6 +161,9 @@ async def _migrate_inbound_emails(db):
         if col not in columns:
             await db.execute(f"ALTER TABLE inbound_emails ADD COLUMN {col} {dtype}")
 
+    # Treat threadId 0 as no thread so replies of replies group correctly.
+    await db.execute("UPDATE inbound_emails SET thread_id = NULL WHERE thread_id = '0' OR thread_id = ''")
+
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

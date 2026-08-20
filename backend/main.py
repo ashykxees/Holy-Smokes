@@ -1117,6 +1117,7 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
         raise Exception(f"Failed to list Zoho messages: {resp.status_code} {resp.text}")
     data = resp.json()
     messages = data.get("data", [])
+    logger.warning("Zoho sync for %s: fetched %s messages", user_email, len(messages))
 
     database = await db.get_db()
     try:
@@ -1126,7 +1127,9 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
             if not zoho_id:
                 continue
             is_read = _zoho_is_read(msg)
-            thread_id = str(msg.get("threadId") or "")
+            raw_thread_id = msg.get("threadId")
+            thread_id = str(raw_thread_id) if raw_thread_id and str(raw_thread_id) != "0" else None
+            logger.warning("Zoho sync message %s threadId=%s is_read=%s", zoho_id, thread_id, is_read)
             cursor = await database.execute("SELECT id FROM inbound_emails WHERE message_id = ?", (zoho_id,))
             existing = await cursor.fetchone()
             if existing:
@@ -1165,11 +1168,13 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
                 ),
             )
             added += 1
+            logger.warning("Zoho sync: inserted message %s in thread %s", zoho_id, thread_id)
             if thread_id:
-                await database.execute(
+                cursor = await database.execute(
                     "UPDATE inbound_emails SET archived = 0 WHERE thread_id = ? AND archived = 1",
                     (thread_id,),
                 )
+                logger.warning("Zoho sync: unarchived %s thread messages for %s", cursor.rowcount, thread_id)
         await database.commit()
         return added
     finally:

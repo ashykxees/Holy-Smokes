@@ -1111,7 +1111,7 @@ async def _zoho_sync_inbox_for_user_async(user: dict) -> int:
 
     url = f"{_zoho_mail_api_url()}/{account_id}/messages/view"
     headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
-    params = {"folderId": folder_id, "limit": 50, "sortBy": "date", "sortorder": "false"}
+    params = {"folderId": folder_id, "limit": 50, "sortBy": "date", "sortorder": "false", "threadedMails": "true", "includeto": "true"}
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     if resp.status_code != 200:
         raise Exception(f"Failed to list Zoho messages: {resp.status_code} {resp.text}")

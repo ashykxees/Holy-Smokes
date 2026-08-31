@@ -87,7 +87,7 @@ async def _get_user(request: Request, require_approved: bool) -> dict:
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, password_hash, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, created_at
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, exp_total, created_at
            FROM users WHERE email = ?""",
         (email,),
     )

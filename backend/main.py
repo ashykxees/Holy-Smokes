@@ -164,7 +164,7 @@ async def auth_register(request: Request):
     await database.commit()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, exp_total
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -187,7 +187,7 @@ async def auth_login(request: Request):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, password_hash
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, exp_total, password_hash
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -300,7 +300,7 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, exp_total
            FROM users WHERE email = ?""",
         (user["email"],),
     )
@@ -317,7 +317,7 @@ async def list_users(user: dict = Depends(get_current_user)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, picture,
-                  is_manager, is_owner, is_dc_employee, team_number
+                  is_manager, is_owner, is_dc_employee, team_number, exp_total
            FROM users WHERE is_approved = 1 ORDER BY name"""
     )
     rows = await cursor.fetchall()
@@ -361,12 +361,18 @@ async def create_task(request: Request, user: dict = Depends(require_manager)):
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
     assigned_to = data.get("assigned_to", "all").strip().lower()
+    try:
+        exp = int(data.get("exp", 0) or 0)
+    except (TypeError, ValueError):
+        exp = 0
+    if exp < 0:
+        exp = 0
     if not title:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Title required")
     database = await db.get_db()
     cursor = await database.execute(
-        "INSERT INTO tasks (title, description, assigned_to, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
-        (title, description, assigned_to, user["email"], db.now_iso()),
+        "INSERT INTO tasks (title, description, assigned_to, exp, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, description, assigned_to, exp, user["email"], db.now_iso()),
     )
     task_id = cursor.lastrowid
     await database.commit()
@@ -379,7 +385,7 @@ async def complete_task(task_id: int, request: Request, user: dict = Depends(get
     data = await request.json()
     completed = bool(data.get("completed", False))
     database = await db.get_db()
-    cursor = await database.execute("SELECT assigned_to, completed FROM tasks WHERE id = ?", (task_id,))
+    cursor = await database.execute("SELECT assigned_to, exp, completed, completed_by FROM tasks WHERE id = ?", (task_id,))
     row = await cursor.fetchone()
     if not row:
         await database.close()
@@ -394,6 +400,22 @@ async def complete_task(task_id: int, request: Request, user: dict = Depends(get
         "UPDATE tasks SET completed = ?, completed_by = ?, completed_at = ? WHERE id = ?",
         (int(completed), completed_by, completed_at, task_id),
     )
+
+    # Award or revoke EXP when completion status changes.
+    was_completed = bool(row["completed"])
+    exp_amount = int(row["exp"] or 0)
+    if completed and not was_completed and exp_amount > 0:
+        await database.execute(
+            "UPDATE users SET exp_total = exp_total + ? WHERE email = ?",
+            (exp_amount, user["email"]),
+        )
+    elif not completed and was_completed and exp_amount > 0:
+        earner = row["completed_by"] or user["email"]
+        await database.execute(
+            "UPDATE users SET exp_total = MAX(0, exp_total - ?) WHERE email = ?",
+            (exp_amount, earner),
+        )
+
     await database.commit()
     await database.close()
     return {"id": task_id, "completed": completed}
@@ -406,6 +428,21 @@ async def delete_task(task_id: int, user: dict = Depends(require_manager)):
     await database.commit()
     await database.close()
     return {"ok": True}
+
+
+@app.get("/api/exp/leaderboard")
+async def exp_leaderboard(user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT email, name, exp_total
+           FROM users WHERE is_approved = 1
+           ORDER BY exp_total DESC, name ASC"""
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    for i, row in enumerate(rows, start=1):
+        row["rank"] = i
+    return rows
 
 
 @app.get("/api/announcements")
@@ -465,7 +502,7 @@ async def admin_list_users(user: dict = Depends(require_owner)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_manager, is_owner, is_approved, is_dc_employee, team_number, created_at
+                  is_manager, is_owner, is_approved, is_dc_employee, team_number, created_at, exp_total
            FROM users ORDER BY name"""
     )
     rows = await cursor.fetchall()
@@ -519,7 +556,7 @@ async def admin_list_pending(user: dict = Depends(require_manager)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, created_at
+                  is_dc_employee, created_at, exp_total
            FROM users WHERE is_approved = 0 ORDER BY created_at DESC"""
     )
     rows = await cursor.fetchall()

@@ -14,7 +14,10 @@ async function loadTasks(user) {
       <li class="flex items-start gap-3 p-4 border border-gray-100 rounded-lg ${t.completed ? 'bg-gray-50' : 'bg-white'}">
         <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask(${t.id}, this.checked)" class="mt-1 h-5 w-5 accent-green-700 cursor-pointer">
         <div class="flex-1 ${t.completed ? 'line-through text-gray-400' : ''}">
-          <div class="font-medium">${escapeHtml(t.title)}</div>
+          <div class="flex items-center gap-2">
+            <div class="font-medium">${escapeHtml(t.title)}</div>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${t.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">+${t.exp || 0} EXP</span>
+          </div>
           ${t.description ? `<div class="text-sm text-gray-600 mt-1">${escapeHtml(t.description)}</div>` : ''}
           <div class="text-xs text-gray-500 mt-2">
             ${t.assigned_to === 'all' ? 'Assigned to entire team' : 'Assigned to ' + escapeHtml(t.assigned_to)}

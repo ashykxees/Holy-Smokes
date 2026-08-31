@@ -30,6 +30,7 @@ def _schema() -> str:
             is_approved INTEGER NOT NULL DEFAULT 0,
             onboarding_completed INTEGER NOT NULL DEFAULT 0,
             team_number INTEGER,
+            exp_total INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
 
@@ -39,6 +40,7 @@ def _schema() -> str:
             description TEXT,
             assigned_to TEXT NOT NULL,
             created_by TEXT NOT NULL,
+            exp INTEGER NOT NULL DEFAULT 0,
             completed INTEGER NOT NULL DEFAULT 0,
             completed_by TEXT,
             completed_at TEXT,
@@ -133,6 +135,7 @@ async def init_db():
     db = await get_db()
     await db.executescript(_schema())
     await _migrate_users(db)
+    await _migrate_tasks(db)
     await _migrate_inbound_emails(db)
     await _migrate_outbound_emails(db)
     await db.commit()
@@ -155,6 +158,7 @@ async def _migrate_users(db):
         ("is_owner", "INTEGER NOT NULL DEFAULT 0"),
         ("is_approved", "INTEGER NOT NULL DEFAULT 0"),
         ("team_number", "INTEGER"),
+        ("exp_total", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col, dtype in additions:
         if col not in columns:
@@ -162,6 +166,18 @@ async def _migrate_users(db):
 
     # Auto-approve existing owners and managers after the column is added.
     await db.execute("UPDATE users SET is_approved = 1 WHERE is_owner = 1 OR is_manager = 1")
+
+
+async def _migrate_tasks(db):
+    """Add columns introduced to tasks after the initial deploy."""
+    async with db.execute("PRAGMA table_info(tasks)") as cursor:
+        columns = {row["name"] for row in await cursor.fetchall()}
+    additions = [
+        ("exp", "INTEGER NOT NULL DEFAULT 0"),
+    ]
+    for col, dtype in additions:
+        if col not in columns:
+            await db.execute(f"ALTER TABLE tasks ADD COLUMN {col} {dtype}")
 
 
 async def _migrate_inbound_emails(db):

@@ -16,7 +16,10 @@ async function loadCompletedTasks() {
     }
     list.innerHTML = tasks.map(t => `
       <li class="p-4 border border-gray-100 rounded-lg bg-gray-50">
-        <div class="font-medium">${escapeHtml(t.title)}</div>
+        <div class="flex items-center gap-2">
+          <div class="font-medium">${escapeHtml(t.title)}</div>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">+${t.exp || 0} EXP</span>
+        </div>
         ${t.description ? `<div class="text-sm text-gray-600 mt-1">${escapeHtml(t.description)}</div>` : ''}
         <div class="text-xs text-gray-500 mt-2">
           ${t.assigned_to === 'all' ? 'Assigned to entire team' : 'Assigned to ' + escapeHtml(t.assigned_to)}

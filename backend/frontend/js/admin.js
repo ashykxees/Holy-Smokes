@@ -4,7 +4,57 @@ async function onAuthReady(user) {
     return;
   }
   currentUser = user;
-  await loadUsers();
+  await Promise.all([loadUsers(), loadEmailLog()]);
+}
+
+async function loadEmailLog() {
+  const container = document.getElementById('email-log-list');
+  if (!container) return;
+
+  try {
+    const logs = await fetchJSON('/api/admin/email-log');
+    if (!logs || logs.length === 0) {
+      container.innerHTML = '<p class="text-gray-500 text-sm">No emails sent yet.</p>';
+      return;
+    }
+
+    const grouped = {};
+    for (const log of logs) {
+      const key = log.sender_email;
+      if (!grouped[key]) {
+        grouped[key] = {
+          name: log.sender_name || log.sender_email,
+          email: log.sender_email,
+          logs: [],
+        };
+      }
+      grouped[key].logs.push(log);
+    }
+
+    container.innerHTML = Object.values(grouped).map(person => `
+      <div class="border border-gray-200 rounded-lg overflow-hidden">
+        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+          <div class="font-semibold text-sm">${escapeHtml(person.name)}</div>
+          <div class="text-xs text-gray-500">${escapeHtml(person.email)}</div>
+        </div>
+        <ul class="max-h-80 overflow-y-auto divide-y divide-gray-100">
+          ${person.logs.map((log, index) => `
+            <li class="p-4 ${index === 0 ? 'bg-hs-cream' : ''}">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wide ${log.type === 'send' ? 'text-hs-green' : 'text-gray-500'}">${log.type === 'send' ? 'Original' : 'Reply'}</span>
+                <span class="text-xs text-gray-500">${formatTime(log.sent_at)}</span>
+              </div>
+              <div class="text-sm font-medium text-gray-900 mb-1">To: ${escapeHtml(log.to_address)}</div>
+              <div class="text-sm text-gray-700 font-semibold mb-2">${escapeHtml(log.subject)}</div>
+              <div class="text-sm text-gray-600 whitespace-pre-wrap line-clamp-4">${escapeHtml((log.body_text || '').substring(0, 400))}${(log.body_text || '').length > 400 ? '…' : ''}</div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<p class="text-red-600 text-sm">Failed to load email log: ${escapeHtml(err.message)}</p>`;
+  }
 }
 
 async function loadUsers() {

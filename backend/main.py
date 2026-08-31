@@ -367,17 +367,23 @@ async def create_task(request: Request, user: dict = Depends(require_manager)):
         exp = 0
     if exp < 0:
         exp = 0
+    due_date = data.get("due_date", "").strip() or None
+    due_time = data.get("due_time", "").strip() or None
+    if due_date and not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid due date is required")
+    if due_time and not re.match(r"^\d{2}:\d{2}$", due_time):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid due time is required")
     if not title:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Title required")
     database = await db.get_db()
     cursor = await database.execute(
-        "INSERT INTO tasks (title, description, assigned_to, exp, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (title, description, assigned_to, exp, user["email"], db.now_iso()),
+        "INSERT INTO tasks (title, description, assigned_to, exp, due_date, due_time, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (title, description or None, assigned_to, exp, due_date, due_time, user["email"], db.now_iso()),
     )
     task_id = cursor.lastrowid
     await database.commit()
     await database.close()
-    return {"id": task_id, "title": title, "description": description, "assigned_to": assigned_to}
+    return {"id": task_id, "title": title, "description": description, "assigned_to": assigned_to, "due_date": due_date, "due_time": due_time}
 
 
 @app.patch("/api/tasks/{task_id}/complete")
@@ -443,6 +449,72 @@ async def exp_leaderboard(user: dict = Depends(get_current_user)):
     for i, row in enumerate(rows, start=1):
         row["rank"] = i
     return rows
+
+
+def _require_manager_or_owner(user: dict):
+    if not (user.get("is_manager") or user.get("is_owner")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Manager access required")
+
+
+@app.get("/api/calendar")
+async def get_calendar(user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT * FROM events ORDER BY event_date, event_time, created_at"
+    )
+    events = [dict(r) for r in await cursor.fetchall()]
+    cursor = await database.execute(
+        "SELECT * FROM tasks WHERE due_date IS NOT NULL ORDER BY due_date, due_time, created_at"
+    )
+    tasks = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return {"events": events, "tasks": tasks}
+
+
+@app.get("/api/events")
+async def list_events(user: dict = Depends(get_current_user)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT * FROM events ORDER BY event_date DESC, event_time, created_at"
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return rows
+
+
+@app.post("/api/events")
+async def create_event(request: Request, user: dict = Depends(get_current_user)):
+    _require_manager_or_owner(user)
+    data = await request.json()
+    title = data.get("title", "").strip()
+    description = data.get("description", "").strip()
+    event_date = data.get("event_date", "").strip()
+    event_time = data.get("event_time", "").strip() or None
+    if not title:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Title required")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", event_date):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid event date is required")
+    if event_time and not re.match(r"^\d{2}:\d{2}$", event_time):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid event time is required")
+    database = await db.get_db()
+    cursor = await database.execute(
+        "INSERT INTO events (title, description, event_date, event_time, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, description or None, event_date, event_time, user["email"], db.now_iso()),
+    )
+    event_id = cursor.lastrowid
+    await database.commit()
+    await database.close()
+    return {"id": event_id, "title": title, "description": description, "event_date": event_date, "event_time": event_time}
+
+
+@app.delete("/api/events/{event_id}")
+async def delete_event(event_id: int, user: dict = Depends(get_current_user)):
+    _require_manager_or_owner(user)
+    database = await db.get_db()
+    await database.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    await database.commit()
+    await database.close()
+    return {"ok": True}
 
 
 @app.get("/api/announcements")

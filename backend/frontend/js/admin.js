@@ -4,7 +4,8 @@ async function onAuthReady(user) {
     return;
   }
   currentUser = user;
-  await Promise.all([loadUsers(), loadEmailLog()]);
+  document.getElementById('event-form').addEventListener('submit', createEvent);
+  await Promise.all([loadUsers(), loadEvents(), loadEmailLog()]);
 }
 
 async function loadEmailLog() {
@@ -131,6 +132,59 @@ async function removeUser(email) {
   try {
     await fetchJSON(`/api/admin/users/${encodeURIComponent(email)}`, { method: 'DELETE' });
     await loadUsers();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function loadEvents() {
+  const list = document.getElementById('events-list');
+  if (!list) return;
+  try {
+    const events = await fetchJSON('/api/events');
+    if (!events.length) {
+      list.innerHTML = '<p class="text-gray-500 text-sm">No calendar events yet.</p>';
+      return;
+    }
+    list.innerHTML = events.map(e => `
+      <div class="p-4 border border-gray-100 rounded-lg bg-white flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <div class="font-semibold">${escapeHtml(e.title)}</div>
+          <div class="text-sm text-gray-500">${new Date(e.event_date + 'T00:00:00').toLocaleDateString()}${e.event_time ? ' at ' + e.event_time : ''}</div>
+          ${e.description ? `<div class="text-sm text-gray-700 mt-1">${escapeHtml(e.description)}</div>` : ''}
+        </div>
+        <button onclick="deleteEvent(${e.id})" class="text-red-600 text-sm hover:underline whitespace-nowrap">Delete</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = `<p class="text-red-600 text-sm">Failed to load events: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function createEvent(e) {
+  e.preventDefault();
+  const title = document.getElementById('event-title').value.trim();
+  const eventDate = document.getElementById('event-date').value;
+  const eventTime = document.getElementById('event-time').value || null;
+  const description = document.getElementById('event-description').value.trim();
+  try {
+    await fetchJSON('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, event_date: eventDate, event_time: eventTime, description }),
+    });
+    document.getElementById('event-form').reset();
+    await loadEvents();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  try {
+    await fetchJSON(`/api/events/${id}`, { method: 'DELETE' });
+    await loadEvents();
   } catch (err) {
     alert(err.message);
   }

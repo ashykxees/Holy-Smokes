@@ -44,6 +44,18 @@ def _schema() -> str:
             completed INTEGER NOT NULL DEFAULT 0,
             completed_by TEXT,
             completed_at TEXT,
+            due_date TEXT,
+            due_time TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            event_date TEXT NOT NULL,
+            event_time TEXT,
+            created_by TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
 
@@ -138,6 +150,7 @@ async def init_db():
     await _migrate_tasks(db)
     await _migrate_inbound_emails(db)
     await _migrate_outbound_emails(db)
+    await _migrate_events(db)
     await db.commit()
     await db.close()
 
@@ -174,6 +187,8 @@ async def _migrate_tasks(db):
         columns = {row["name"] for row in await cursor.fetchall()}
     additions = [
         ("exp", "INTEGER NOT NULL DEFAULT 0"),
+        ("due_date", "TEXT"),
+        ("due_time", "TEXT"),
     ]
     for col, dtype in additions:
         if col not in columns:
@@ -195,6 +210,21 @@ async def _migrate_inbound_emails(db):
 
     # Treat threadId 0 as no thread so replies of replies group correctly.
     await db.execute("UPDATE inbound_emails SET thread_id = NULL WHERE thread_id = '0' OR thread_id = ''")
+
+
+async def _migrate_events(db):
+    """Add events table introduced for the calendar page."""
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            event_date TEXT NOT NULL,
+            event_time TEXT,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )"""
+    )
 
 
 async def _migrate_outbound_emails(db):

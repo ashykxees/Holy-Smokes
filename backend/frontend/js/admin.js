@@ -137,6 +137,22 @@ async function removeUser(email) {
   }
 }
 
+function eventGoogleCalendarUrl(e) {
+  const title = encodeURIComponent(e.title);
+  const details = encodeURIComponent(e.description || '');
+  if (e.event_time) {
+    const [hour, minute] = e.event_time.split(':').map(Number);
+    const start = new Date(`${e.event_date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const fmt = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`;
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${fmt(start)}/${fmt(end)}`;
+  }
+  const start = new Date(`${e.event_date}T00:00:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const fmt = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${fmt(start)}/${fmt(end)}`;
+}
+
 async function loadEvents() {
   const list = document.getElementById('events-list');
   if (!list) return;
@@ -153,7 +169,10 @@ async function loadEvents() {
           <div class="text-sm text-gray-500">${new Date(e.event_date + 'T00:00:00').toLocaleDateString()}${e.event_time ? ' at ' + e.event_time : ''}</div>
           ${e.description ? `<div class="text-sm text-gray-700 mt-1">${escapeHtml(e.description)}</div>` : ''}
         </div>
-        <button onclick="deleteEvent(${e.id})" class="text-red-600 text-sm hover:underline whitespace-nowrap">Delete</button>
+        <div class="flex flex-col items-end gap-2">
+          <a href="${eventGoogleCalendarUrl(e)}" target="_blank" rel="noopener" class="btn-secondary text-xs whitespace-nowrap">Add to Google Calendar</a>
+          <button onclick="deleteEvent(${e.id})" class="text-red-600 text-sm hover:underline whitespace-nowrap">Delete</button>
+        </div>
       </div>
     `).join('');
   } catch (err) {

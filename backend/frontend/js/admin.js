@@ -1,8 +1,11 @@
+let currentUser = null;
+
 async function onAuthReady(user) {
   if (!user || !user.is_owner) {
     window.location.href = '/dashboard';
     return;
   }
+  currentUser = user;
   await loadUsers();
 }
 
@@ -30,10 +33,11 @@ async function loadUsers() {
             ${u.phone ? `<div class="text-xs text-gray-400">${escapeHtml(u.phone)}</div>` : ''}
           </div>
         </div>
-        ${u.is_owner ? '' : `
+        ${u.is_owner || u.email === currentUser.email ? '' : `
           <button onclick="toggleManager('${escapeHtml(u.email)}', ${!u.is_manager})" class="${!u.is_manager ? 'btn-primary' : 'btn-secondary'} whitespace-nowrap">
             ${u.is_manager ? 'Demote' : 'Make Manager'}
           </button>
+          <button onclick="removeUser('${escapeHtml(u.email)}')" class="btn-secondary whitespace-nowrap text-red-600 border-red-200 hover:bg-red-50 ml-2">Remove</button>
         `}
       </div>
     `).join('');
@@ -49,6 +53,16 @@ async function toggleManager(email, makeManager) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_manager: makeManager }),
     });
+    await loadUsers();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function removeUser(email) {
+  if (!confirm(`Remove ${email} from the portal? This cannot be undone.`)) return;
+  try {
+    await fetchJSON(`/api/admin/users/${encodeURIComponent(email)}`, { method: 'DELETE' });
     await loadUsers();
   } catch (err) {
     alert(err.message);

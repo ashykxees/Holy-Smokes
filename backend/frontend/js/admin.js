@@ -1,5 +1,3 @@
-let currentUser = null;
-
 async function onAuthReady(user) {
   if (!user || !user.is_owner) {
     window.location.href = '/dashboard';

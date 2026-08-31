@@ -30,11 +30,13 @@ async function createTask(e) {
   const description = document.getElementById('task-description').value.trim();
   const assignedTo = document.getElementById('task-assignee').value;
   const exp = parseInt(document.getElementById('task-exp').value, 10) || 0;
+  const dueDate = document.getElementById('task-due-date').value || null;
+  const dueTime = document.getElementById('task-due-time').value || null;
   try {
     await fetchJSON('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, assigned_to: assignedTo, exp }),
+      body: JSON.stringify({ title, description, assigned_to: assignedTo, exp, due_date: dueDate, due_time: dueTime }),
     });
     document.getElementById('task-form').reset();
     alert('Task assigned!');

@@ -21,6 +21,7 @@ async function loadTasks(user) {
           ${t.description ? `<div class="text-sm text-gray-600 mt-1">${escapeHtml(t.description)}</div>` : ''}
           <div class="text-xs text-gray-500 mt-2">
             ${t.assigned_to === 'all' ? 'Assigned to entire team' : 'Assigned to ' + escapeHtml(t.assigned_to)}
+            ${t.due_date ? `• Due ${new Date(t.due_date + 'T00:00:00').toLocaleDateString()}${t.due_time ? ' at ' + t.due_time : ''}` : ''}
             ${t.completed ? `• completed by ${escapeHtml(t.completed_by)} ${formatTime(t.completed_at)}` : ''}
           </div>
         </div>

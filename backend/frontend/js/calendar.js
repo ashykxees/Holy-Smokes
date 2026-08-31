@@ -58,7 +58,7 @@ function renderCalendar(date) {
       dots.className = 'flex flex-wrap gap-1 mt-auto';
       items.forEach(item => {
         const span = document.createElement('span');
-        span.className = `text-[10px] truncate px-1.5 py-0.5 rounded ${item.event_date ? 'bg-hs-green text-white' : 'bg-yellow-100 text-yellow-800'}`;
+        span.className = `text-[10px] truncate inline-block max-w-full px-1.5 py-0.5 rounded mb-1 ${item.event_date ? 'bg-hs-green text-white' : 'bg-yellow-100 text-yellow-800'}`;
         span.textContent = item.title;
         span.title = item.title;
         dots.appendChild(span);
@@ -92,7 +92,7 @@ function showDay(iso, items) {
     return;
   }
 
-  items.sort((a, b) => (a.event_time || '23:59').localeCompare(b.event_time || '23:59'));
+  items.sort((a, b) => (a.event_time || a.due_time || '23:59').localeCompare(b.event_time || b.due_time || '23:59'));
 
   list.innerHTML = items.map(item => {
     const isEvent = 'event_date' in item;

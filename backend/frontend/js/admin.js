@@ -35,6 +35,11 @@ async function loadUsers() {
           <button onclick="toggleManager('${escapeHtml(u.email)}', ${!u.is_manager})" class="${!u.is_manager ? 'btn-primary' : 'btn-secondary'} whitespace-nowrap">
             ${u.is_manager ? 'Demote' : 'Make Manager'}
           </button>
+          <select onchange="setTeam('${escapeHtml(u.email)}', this.value)" class="ml-2 px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white whitespace-nowrap">
+            <option value="" ${u.team_number ? '' : 'selected'}>No team</option>
+            <option value="1" ${u.team_number === 1 ? 'selected' : ''}>Team 1</option>
+            <option value="2" ${u.team_number === 2 ? 'selected' : ''}>Team 2</option>
+          </select>
           <button onclick="removeUser('${escapeHtml(u.email)}')" class="btn-secondary whitespace-nowrap text-red-600 border-red-200 hover:bg-red-50 ml-2">Remove</button>
         `}
       </div>
@@ -50,6 +55,20 @@ async function toggleManager(email, makeManager) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_manager: makeManager }),
+    });
+    await loadUsers();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function setTeam(email, teamNumber) {
+  const value = teamNumber === '' ? null : parseInt(teamNumber, 10);
+  try {
+    await fetchJSON(`/api/admin/users/${encodeURIComponent(email)}/team`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_number: value }),
     });
     await loadUsers();
   } catch (err) {

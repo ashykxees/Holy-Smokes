@@ -164,7 +164,7 @@ async def auth_register(request: Request):
     await database.commit()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -187,7 +187,7 @@ async def auth_login(request: Request):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, password_hash
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, password_hash
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -300,7 +300,7 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number
            FROM users WHERE email = ?""",
         (user["email"],),
     )
@@ -316,7 +316,8 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 async def list_users(user: dict = Depends(get_current_user)):
     database = await db.get_db()
     cursor = await database.execute(
-        """SELECT email, dc_email, name, first_name, last_name, nickname, picture, is_manager
+        """SELECT email, dc_email, name, first_name, last_name, nickname, picture,
+                  is_manager, is_owner, is_dc_employee, team_number
            FROM users WHERE is_approved = 1 ORDER BY name"""
     )
     rows = await cursor.fetchall()
@@ -464,7 +465,7 @@ async def admin_list_users(user: dict = Depends(require_owner)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, name, first_name, last_name, nickname, phone,
-                  is_manager, is_owner, is_approved, created_at
+                  is_manager, is_owner, is_approved, is_dc_employee, team_number, created_at
            FROM users ORDER BY name"""
     )
     rows = await cursor.fetchall()
@@ -487,6 +488,30 @@ async def admin_set_manager(email: str, request: Request, user: dict = Depends(r
     await database.commit()
     await database.close()
     return {"email": target_email, "is_manager": is_manager}
+
+
+@app.patch("/api/admin/users/{email}/team")
+async def admin_set_team(email: str, request: Request, user: dict = Depends(require_owner)):
+    data = await request.json()
+    team_number = data.get("team_number")
+    if team_number is not None:
+        try:
+            team_number = int(team_number)
+            if team_number not in (1, 2):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Team must be 1 or 2")
+    target_email = email.lower().strip()
+    if target_email == user["email"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="You cannot change your own team")
+    database = await db.get_db()
+    await database.execute(
+        "UPDATE users SET team_number = ? WHERE email = ?",
+        (team_number, target_email),
+    )
+    await database.commit()
+    await database.close()
+    return {"email": target_email, "team_number": team_number}
 
 
 @app.get("/api/admin/pending")

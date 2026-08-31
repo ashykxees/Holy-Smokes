@@ -3,22 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team | Holy Smokes</title>
+  <title>My Team | Holy Smokes</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/css/styles.css?v=8">
-  <script src="/js/app.js?v=8"></script>
-  <script src="/js/team.js?v=4"></script>
+  <link rel="stylesheet" href="/css/styles.css?v=9">
+  <script src="/js/app.js?v=9"></script>
+  <script src="/js/team.js?v=5"></script>
 </head>
 <body class="min-h-screen flex flex-col md:flex-row">
   <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
   <main class="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
     <header class="mb-6">
-      <h1 class="text-3xl font-bold">Team Roster</h1>
-      <p class="text-gray-500">Everyone on the Holy Smokes BBQ team.</p>
+      <h1 class="text-3xl font-bold">My Team</h1>
+      <p class="text-gray-500">Your team and the full Holy Smokes BBQ roster.</p>
     </header>
 
+    <section class="card mb-6">
+      <h2 class="text-lg font-semibold mb-4">Your Manager</h2>
+      <div id="manager-card"></div>
+    </section>
+
+    <section class="card mb-6">
+      <h2 class="text-lg font-semibold mb-4">Teammates</h2>
+      <div id="teammates-list" class="divide-y divide-gray-100"></div>
+    </section>
+
     <section class="card">
-      <div id="team-list" class="divide-y divide-gray-100"></div>
+      <h2 class="text-lg font-semibold mb-4">Full Team Roster</h2>
+      <div id="full-team-list" class="divide-y divide-gray-100"></div>
     </section>
   </main>
 </body>

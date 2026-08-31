@@ -65,6 +65,7 @@ def create_session_token(user: dict) -> str:
         "is_owner": user.get("is_owner", False),
         "is_approved": user.get("is_approved", False),
         "onboarding_completed": user.get("onboarding_completed", False),
+        "team_number": user.get("team_number"),
         "exp": datetime.now(timezone.utc) + timedelta(days=30),
     }
     return jwt.encode(payload, jwt_secret(), algorithm="HS256")
@@ -86,7 +87,7 @@ async def _get_user(request: Request, require_approved: bool) -> dict:
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT email, dc_email, password_hash, name, first_name, last_name, nickname, phone,
-                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, created_at
+                  is_dc_employee, picture, is_manager, is_owner, is_approved, onboarding_completed, team_number, created_at
            FROM users WHERE email = ?""",
         (email,),
     )
@@ -142,7 +143,7 @@ async def get_ws_user_from_cookie(cookie_header: str | None) -> dict:
 
     database = await db.get_db()
     cursor = await database.execute(
-        """SELECT email, name, is_manager, is_owner, is_approved FROM users WHERE email = ?""",
+        """SELECT email, name, is_manager, is_owner, is_approved, team_number FROM users WHERE email = ?""",
         (email,),
     )
     row = await cursor.fetchone()

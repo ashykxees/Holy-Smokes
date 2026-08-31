@@ -29,6 +29,7 @@ def _schema() -> str:
             is_owner INTEGER NOT NULL DEFAULT 0,
             is_approved INTEGER NOT NULL DEFAULT 0,
             onboarding_completed INTEGER NOT NULL DEFAULT 0,
+            team_number INTEGER,
             created_at TEXT NOT NULL
         );
 
@@ -139,6 +140,7 @@ async def _migrate_users(db):
         ("password_hash", "TEXT"),
         ("is_owner", "INTEGER NOT NULL DEFAULT 0"),
         ("is_approved", "INTEGER NOT NULL DEFAULT 0"),
+        ("team_number", "INTEGER"),
     ]
     for col, dtype in additions:
         if col not in columns:

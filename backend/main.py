@@ -551,13 +551,27 @@ async def admin_delete_user(email: str, user: dict = Depends(require_manager)):
     return {"ok": True}
 
 
+@app.get("/api/admin/email-log")
+async def admin_email_log(user: dict = Depends(require_owner)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT o.*, u.name as sender_name
+           FROM outbound_emails o
+           LEFT JOIN users u ON LOWER(u.email) = LOWER(o.sender_email)
+           ORDER BY o.sent_at DESC"""
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return rows
+
+
 _CATERING_ALLOWED_ITEMS = {
     "Pulled Pork", "Brisket", "Ribs", "Mac n Cheese", "Special Request"
 }
 _CATERING_ALLOWED_EVENTS = {"Party", "Wedding", "Gathering", "Other"}
 
 
-def _send_sendgrid_email_sync(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
+def _send_sendgrid_email_sync(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
     payload = {
         "personalizations": [{"to": [{"email": to_email}]}],
         "from": {"email": from_email},
@@ -567,6 +581,8 @@ def _send_sendgrid_email_sync(api_key: str, from_email: str, to_email: str, subj
             {"type": "text/html", "value": html_body},
         ],
     }
+    if extra_headers:
+        payload["headers"] = extra_headers
     data_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         "https://api.sendgrid.com/v3/mail/send",
@@ -587,8 +603,8 @@ def _send_sendgrid_email_sync(api_key: str, from_email: str, to_email: str, subj
         raise Exception(f"SendGrid error {exc.code}: {body}") from exc
 
 
-async def _send_sendgrid_email(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str):
-    return await asyncio.to_thread(_send_sendgrid_email_sync, api_key, from_email, to_email, subject, plain_body, html_body)
+async def _send_sendgrid_email(api_key: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
+    return await asyncio.to_thread(_send_sendgrid_email_sync, api_key, from_email, to_email, subject, plain_body, html_body, extra_headers)
 
 
 def _send_mailgun_email_sync(api_key: str, domain: str, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
@@ -865,11 +881,8 @@ holysmokes.cc"""
 
 
 def _email_outgoing_allowed(user: dict) -> bool:
-    allowed = [a.strip().lower() for a in (os.environ.get("OUTGOING_EMAIL_USERS") or "griffin,asa").split(",")]
-    local = _email_local_part(user).lower()
-    first = (user.get("first_name") or "").strip().lower()
-    email_local = (user.get("email") or "").split("@")[0].lower()
-    return local in allowed or first in allowed or email_local in allowed
+    # Every approved, logged-in team member may send team email.
+    return bool(user)
 
 
 def _zoho_smtp_credentials(user: dict) -> dict:
@@ -1067,10 +1080,52 @@ async def _send_zoho_email_api(user: dict, from_email: str, to_email: str, subje
 
 
 async def _send_team_email_backend(user: dict, from_email: str, to_email: str, subject: str, plain_body: str, html_body: str, extra_headers: dict | None = None):
+    last_error: Exception | None = None
+
+    mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
+    mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or os.environ.get("MAILGUN_FROM_DOMAIN")
+    if mailgun_key and mailgun_domain:
+        try:
+            await _send_mailgun_email(mailgun_key, mailgun_domain, from_email, to_email, subject, plain_body, html_body, extra_headers)
+            return
+        except Exception as exc:
+            last_error = exc
+
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SMTP_PASS")
+    if sendgrid_key and (
+        os.environ.get("SENDGRID_API_KEY")
+        or os.environ.get("SMTP_HOST") == "smtp.sendgrid.net"
+    ):
+        try:
+            await _send_sendgrid_email(sendgrid_key, from_email, to_email, subject, plain_body, html_body, extra_headers)
+            return
+        except Exception as exc:
+            last_error = exc
+
     if _zoho_refresh_token_for_user(user):
-        await _send_zoho_email_api(user, from_email, to_email, subject, html_body)
+        try:
+            await _send_zoho_email_api(user, from_email, to_email, subject, html_body)
+            return
+        except Exception as exc:
+            last_error = exc
+
+    try:
+        await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers)
         return
-    await _send_smtp_email(from_email, to_email, subject, plain_body, html_body, user, extra_headers)
+    except Exception as exc:
+        last_error = exc
+
+    raise last_error or Exception("No email backend configured for this user")
+
+
+def _user_inbox_addresses(user: dict) -> list[str]:
+    """Return all email aliases that should belong to this user's inbox."""
+    addresses = {
+        _zoho_user_email(user).lower(),
+        (user.get("email") or "").strip().lower(),
+        (user.get("dc_email") or "").strip().lower(),
+    }
+    return [a for a in addresses if a and "@" in a]
 
 
 def _zoho_user_email(user: dict) -> str:
@@ -1231,8 +1286,6 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Subject is required")
     if not body_text:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Body is required")
-    if not _email_outgoing_allowed(user):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not have permission to send team email")
 
     from_domain = os.environ.get("EMAIL_FROM_DOMAIN") or os.environ.get("MAILGUN_DOMAIN") or "holysmokes.cc"
     from_email = f"{_email_local_part(user)}@{from_domain}"
@@ -1256,6 +1309,16 @@ async def send_team_email(request: Request, user: dict = Depends(get_current_use
     except Exception as exc:
         traceback.print_exc()
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+
+    database = await db.get_db()
+    await database.execute(
+        """INSERT INTO outbound_emails
+           (sender_email, to_address, subject, body_text, body_html, type, sent_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (user["email"], to_email, subject, body_text, html_body, "send", db.now_iso()),
+    )
+    await database.commit()
+    await database.close()
 
     return {"ok": True}
 
@@ -1348,10 +1411,13 @@ async def list_inbox(user: dict = Depends(get_current_user), archived: bool = Fa
     # Sync latest messages from the user's Zoho mailbox if configured.
     await _sync_zoho_inbox(user)
 
+    user_addresses = _user_inbox_addresses(user)
+    placeholders = ",".join("?" * len(user_addresses))
+
     database = await db.get_db()
     cursor = await database.execute(
-        "SELECT * FROM inbound_emails WHERE archived = ? ORDER BY received_at DESC",
-        (1 if archived else 0,),
+        f"SELECT * FROM inbound_emails WHERE archived = ? AND LOWER(to_address) IN ({placeholders}) ORDER BY received_at DESC",
+        (1 if archived else 0, *user_addresses),
     )
     rows = await cursor.fetchall()
     results = []
@@ -1384,8 +1450,14 @@ def _zoho_mark_read_sync(user: dict, message_id: str, account_email: str):
 
 @app.get("/api/inbox/{email_id}")
 async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user)):
+    user_addresses = _user_inbox_addresses(user)
+    addr_placeholders = ",".join("?" * len(user_addresses))
+
     database = await db.get_db()
-    cursor = await database.execute("SELECT * FROM inbound_emails WHERE id = ?", (email_id,))
+    cursor = await database.execute(
+        f"SELECT * FROM inbound_emails WHERE id = ? AND LOWER(to_address) IN ({addr_placeholders})",
+        (email_id, *user_addresses),
+    )
     row = await cursor.fetchone()
     if not row:
         await database.close()
@@ -1404,8 +1476,8 @@ async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user))
     thread_emails = []
     if email.get("thread_id"):
         cursor = await database.execute(
-            "SELECT * FROM inbound_emails WHERE thread_id = ? AND id != ? ORDER BY received_at ASC",
-            (email["thread_id"], email_id),
+            f"SELECT * FROM inbound_emails WHERE thread_id = ? AND id != ? AND LOWER(to_address) IN ({addr_placeholders}) ORDER BY received_at ASC",
+            (email["thread_id"], email_id, *user_addresses),
         )
         thread_emails = [dict(r) for r in await cursor.fetchall()]
 
@@ -1438,8 +1510,14 @@ async def get_inbox_email(email_id: int, user: dict = Depends(get_current_user))
 
 @app.post("/api/inbox/{email_id}/archive")
 async def toggle_archive_email(email_id: int, user: dict = Depends(get_current_user)):
+    user_addresses = _user_inbox_addresses(user)
+    placeholders = ",".join("?" * len(user_addresses))
+
     database = await db.get_db()
-    cursor = await database.execute("SELECT archived FROM inbound_emails WHERE id = ?", (email_id,))
+    cursor = await database.execute(
+        f"SELECT archived FROM inbound_emails WHERE id = ? AND LOWER(to_address) IN ({placeholders})",
+        (email_id, *user_addresses),
+    )
     row = await cursor.fetchone()
     if not row:
         await database.close()
@@ -1453,16 +1531,19 @@ async def toggle_archive_email(email_id: int, user: dict = Depends(get_current_u
 
 @app.post("/api/inbox/{email_id}/reply")
 async def reply_inbox_email(request: Request, email_id: int, user: dict = Depends(get_current_user)):
-    if not _email_outgoing_allowed(user):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not have permission to reply to team email")
-
     data = await request.json()
     reply_text = (data.get("body") or "").strip()
     if not reply_text:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Reply body is required")
 
+    user_addresses = _user_inbox_addresses(user)
+    placeholders = ",".join("?" * len(user_addresses))
+
     database = await db.get_db()
-    cursor = await database.execute("SELECT * FROM inbound_emails WHERE id = ?", (email_id,))
+    cursor = await database.execute(
+        f"SELECT * FROM inbound_emails WHERE id = ? AND LOWER(to_address) IN ({placeholders})",
+        (email_id, *user_addresses),
+    )
     row = await cursor.fetchone()
     if not row:
         await database.close()
@@ -1527,6 +1608,12 @@ On {inbound.get('received_at')}, {inbound.get('from_name') or to_email} wrote:
             html_body,
             db.now_iso(),
         ),
+    )
+    await database.execute(
+        """INSERT INTO outbound_emails
+           (sender_email, to_address, subject, body_text, body_html, type, inbound_email_id, sent_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user["email"], to_email, subject, reply_text, html_body, "reply", email_id, db.now_iso()),
     )
     await database.execute("UPDATE inbound_emails SET replied = 1 WHERE id = ?", (email_id,))
     await database.commit()

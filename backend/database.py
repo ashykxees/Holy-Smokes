@@ -106,6 +106,19 @@ def _schema() -> str:
             sent_at TEXT NOT NULL,
             FOREIGN KEY (inbound_email_id) REFERENCES inbound_emails(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS outbound_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_email TEXT NOT NULL,
+            to_address TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body_text TEXT,
+            body_html TEXT,
+            type TEXT NOT NULL DEFAULT 'send',
+            inbound_email_id INTEGER,
+            sent_at TEXT NOT NULL,
+            FOREIGN KEY (inbound_email_id) REFERENCES inbound_emails(id) ON DELETE SET NULL
+        );
     """
 
 
@@ -121,6 +134,7 @@ async def init_db():
     await db.executescript(_schema())
     await _migrate_users(db)
     await _migrate_inbound_emails(db)
+    await _migrate_outbound_emails(db)
     await db.commit()
     await db.close()
 
@@ -165,6 +179,24 @@ async def _migrate_inbound_emails(db):
 
     # Treat threadId 0 as no thread so replies of replies group correctly.
     await db.execute("UPDATE inbound_emails SET thread_id = NULL WHERE thread_id = '0' OR thread_id = ''")
+
+
+async def _migrate_outbound_emails(db):
+    """Add outbound_emails table introduced for the admin email log."""
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS outbound_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_email TEXT NOT NULL,
+            to_address TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body_text TEXT,
+            body_html TEXT,
+            type TEXT NOT NULL DEFAULT 'send',
+            inbound_email_id INTEGER,
+            sent_at TEXT NOT NULL,
+            FOREIGN KEY (inbound_email_id) REFERENCES inbound_emails(id) ON DELETE SET NULL
+        )"""
+    )
 
 
 def now_iso():

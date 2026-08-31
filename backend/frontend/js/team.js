@@ -46,7 +46,7 @@ function renderManager(manager, teamNumber) {
 
 function renderTeammates(users, teamNumber) {
   const teammates = users.filter(
-    u => u.team_number === teamNumber && u.email !== currentUser.email && !u.is_manager
+    u => u.team_number === teamNumber && u.email !== currentUser.email && !u.is_manager && !u.is_owner
   );
   if (!teamNumber) {
     return '<p class="text-gray-500 p-4">Join a team to see your teammates here.</p>';

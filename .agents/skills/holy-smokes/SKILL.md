@@ -26,3 +26,4 @@ The SQLite DB is at `backend/data/holysmokes.db` and persists across sessions. C
 - The app uses session cookies, so open Chrome at `http://localhost:8000` and use the form login.
 - Left-sidebar coordinates are unreliable because nav item count changes per role (owner, manager, regular user). For navigation, prefer the browser console or address bar over precise click coordinates to avoid misclicking links.
 - The login form has IDs `email` and `password`; setting them via the browser console and calling `document.getElementById('login-form').requestSubmit()` is a reliable way to switch users when native typing is flaky.
+- Tiny UI targets such as the task completion checkbox may not register with `left_click` coordinates in the test harness. As a fallback, trigger the element's click handler from the console, e.g. `document.querySelector('#tasks input[type="checkbox"]').click()`, and verify the UI state change rather than treating a missed click as a bug.

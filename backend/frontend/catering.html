@@ -6,12 +6,20 @@
   <title>Catering | Holy Smokes BBQ Team</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/styles.css?v=10">
+  <style>
+    .smoke { animation: rise 2.4s ease-in-out infinite; }
+    .smoke-2 { animation-delay: 1.2s; }
+    @keyframes rise {
+      0% { transform: translateY(0); opacity: 0.5; }
+      100% { transform: translateY(-10px); opacity: 0; }
+    }
+  </style>
 </head>
 <body class="bg-white text-hs-black">
   <!-- Announcement bar -->
   <div class="bg-hs-green text-white text-center text-sm py-2 px-4">
     Now serving smoked food at the DC concession stand for exclusive events.
-    <a href="/catering" class="underline font-semibold ml-1">Book us for catering &rarr;</a>
+    <span class="font-semibold ml-1">Catering coming soon.</span>
   </div>
 
   <!-- Header -->
@@ -43,94 +51,43 @@
   </header>
 
   <main class="max-w-3xl mx-auto px-4 py-16 md:py-24">
-    <div class="text-center mb-12">
-      <h1 class="text-4xl md:text-5xl font-display mb-4">Catering</h1>
-      <p class="text-gray-700 text-lg">Want Holy Smokes at your next event? Fill out the form below and we'll be in touch.</p>
-    </div>
-
-    <form id="catering-form" class="card space-y-6">
-      <div class="grid md:grid-cols-2 gap-6">
-        <div>
-          <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Name</label>
-          <input id="name" name="name" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Jane Doe">
-        </div>
-        <div>
-          <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone Number</label>
-          <input id="phone" name="phone" type="tel" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="(610) 555-1234">
-        </div>
-      </div>
-
-      <div class="grid md:grid-cols-2 gap-6">
-        <div>
-          <label for="event_type" class="block text-sm font-semibold text-gray-700 mb-1">Event Type</label>
-          <select id="event_type" name="event_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
-            <option value="">Select an event type</option>
-            <option value="Party">Party</option>
-            <option value="Wedding">Wedding</option>
-            <option value="Gathering">Gathering</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div>
-          <label for="guests" class="block text-sm font-semibold text-gray-700 mb-1">Expected # of Guests</label>
-          <input id="guests" name="guests" type="number" min="1" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="50">
-        </div>
-      </div>
-
-      <div>
-        <label for="event_date" class="block text-sm font-semibold text-gray-700 mb-1">Event Date</label>
-        <input id="event_date" name="event_date" type="date" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
-      </div>
-
-      <div>
-        <span class="block text-sm font-semibold text-gray-700 mb-2">Requested Food Items</span>
-        <div class="grid sm:grid-cols-2 gap-3">
-          <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input type="checkbox" name="items" value="Pulled Pork" class="w-4 h-4 accent-hs-green">
-            <span class="text-sm">Pulled Pork</span>
-          </label>
-          <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input type="checkbox" name="items" value="Brisket" class="w-4 h-4 accent-hs-green">
-            <span class="text-sm">Brisket</span>
-          </label>
-          <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input type="checkbox" name="items" value="Ribs" class="w-4 h-4 accent-hs-green">
-            <span class="text-sm">Ribs</span>
-          </label>
-          <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input type="checkbox" name="items" value="Mac n Cheese" class="w-4 h-4 accent-hs-green">
-            <span class="text-sm">Mac n Cheese</span>
-          </label>
-          <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 sm:col-span-2">
-            <input type="checkbox" name="items" value="Special Request" class="w-4 h-4 accent-hs-green">
-            <span class="text-sm">Special Request (list below)</span>
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <label for="description" class="block text-sm font-semibold text-gray-700 mb-1">Description of Event &amp; Special Requests</label>
-        <textarea id="description" name="description" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Tell us about your event, dietary needs, or any special requests."></textarea>
-      </div>
-
-      <button type="submit" id="submit-btn" class="btn-primary w-full py-3 text-base">Submit Catering Request</button>
-    </form>
-  </main>
-
-  <!-- Success Modal -->
-  <div id="success-modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4" aria-hidden="true">
-    <div class="bg-white rounded-xl max-w-sm w-full p-8 text-center shadow-2xl">
-      <div class="mb-6">
-        <svg class="checkmark mx-auto" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-          <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-          <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+    <div class="card text-center py-14 px-6 md:px-12">
+      <div class="relative w-40 h-40 mx-auto mb-8">
+        <!-- Trailer smoker -->
+        <svg class="absolute inset-0 w-full h-full text-hs-green" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+          <!-- smoke -->
+          <path class="smoke" d="M118 34c-4-6 2-10 0-16" opacity="0.5"/>
+          <path class="smoke smoke-2" d="M126 30c-4-6 2-10 0-16" opacity="0.35"/>
+          <!-- chimney -->
+          <rect x="112" y="40" width="14" height="26" rx="2" fill="currentColor"/>
+          <!-- main barrel -->
+          <rect x="24" y="62" width="104" height="44" rx="22" fill="#F3F1EA"/>
+          <line x1="24" y1="84" x2="128" y2="84"/>
+          <!-- door handle -->
+          <line x1="66" y1="74" x2="86" y2="74" stroke-width="5"/>
+          <!-- firebox -->
+          <rect x="6" y="76" width="22" height="26" rx="3" fill="currentColor"/>
+          <!-- trailer frame -->
+          <line x1="20" y1="112" x2="140" y2="112"/>
+          <line x1="140" y1="112" x2="156" y2="120"/>
+          <!-- wheels -->
+          <circle cx="50" cy="124" r="10" fill="#F3F1EA"/>
+          <circle cx="50" cy="124" r="3" fill="currentColor"/>
+          <circle cx="108" cy="124" r="10" fill="#F3F1EA"/>
+          <circle cx="108" cy="124" r="3" fill="currentColor"/>
         </svg>
+        <!-- Lock badge -->
+        <div class="absolute -bottom-2 -right-2 w-16 h-16 rounded-full bg-hs-green text-white flex items-center justify-center shadow-lg border-4 border-white">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5" fill="currentColor"/></svg>
+        </div>
       </div>
-      <h2 class="text-2xl font-display mb-3">Thanks for reaching out.</h2>
-      <p class="text-gray-700 mb-6">Expect a reply within 1-2 business days from our team.</p>
-      <button id="close-modal" class="btn-primary w-full">Back to Home</button>
+      <h1 class="text-4xl md:text-5xl font-display mb-4">Catering Coming Soon</h1>
+      <p class="text-gray-700 text-lg leading-relaxed max-w-xl mx-auto mb-8">
+        We are currently training our team to prepare you the best catering experience we can offer. Check back in a few weeks to see what we offer.
+      </p>
+      <a href="/" class="btn-primary inline-block">Back to Home</a>
     </div>
-  </div>
+  </main>
 
   <!-- Footer -->
   <footer class="bg-hs-black text-white py-10">
@@ -159,53 +116,6 @@
       });
     }
 
-    const form = document.getElementById('catering-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const modal = document.getElementById('success-modal');
-    const closeModal = document.getElementById('close-modal');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Sending...';
-
-      const data = {
-        name: form.name.value.trim(),
-        phone: form.phone.value.trim(),
-        event_type: form.event_type.value,
-        guests: parseInt(form.guests.value, 10),
-        event_date: form.event_date.value,
-        items: Array.from(form.querySelectorAll('input[name="items"]:checked')).map(cb => cb.value),
-        description: form.description.value.trim(),
-      };
-
-      try {
-        const res = await fetch('/api/catering', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(result.detail || 'Something went wrong. Please try again.');
-        }
-        form.reset();
-        modal.classList.remove('hidden');
-      } catch (err) {
-        alert(err.message || 'Failed to send request.');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Catering Request';
-      }
-    });
-
-    closeModal.addEventListener('click', () => {
-      window.location.href = '/';
-    });
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) window.location.href = '/';
-    });
   </script>
 </body>
 </html>

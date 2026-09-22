@@ -358,17 +358,17 @@ async def list_tasks(request: Request, user: dict = Depends(get_current_user)):
 @app.post("/api/tasks")
 async def create_task(request: Request, user: dict = Depends(require_manager)):
     data = await request.json()
-    title = data.get("title", "").strip()
-    description = data.get("description", "").strip()
-    assigned_to = data.get("assigned_to", "all").strip().lower()
+    title = (data.get("title") or "").strip()
+    description = (data.get("description") or "").strip() or None
+    assigned_to = (data.get("assigned_to") or "all").strip().lower()
     try:
         exp = int(data.get("exp", 0) or 0)
     except (TypeError, ValueError):
         exp = 0
     if exp < 0:
         exp = 0
-    due_date = data.get("due_date", "").strip() or None
-    due_time = data.get("due_time", "").strip() or None
+    due_date = (data.get("due_date") or "").strip() or None
+    due_time = (data.get("due_time") or "").strip() or None
     if due_date and not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid due date is required")
     if due_time and not re.match(r"^\d{2}:\d{2}$", due_time):

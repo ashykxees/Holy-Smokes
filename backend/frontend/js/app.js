@@ -19,7 +19,7 @@ const QUOTES = [
 ];
 
 async function fetchJSON(url, options = {}) {
-  const res = await fetch(url, { credentials: 'include', ...options });
+  const res = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
   if (res.status === 401) {
     if (!isAuthPage()) {
       window.location.href = '/login';

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homecoming | Holy Smokes BBQ Team</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css?v=10">
+  <style>
+    .hero-bg {
+      background-image: url('/assets/homecoming-game.png');
+      background-size: cover;
+      background-position: center;
+    }
+    .hero-overlay {
+      background: linear-gradient(135deg, rgba(50,74,42,0.85) 0%, rgba(21,22,20,0.7) 100%);
+    }
+  </style>
+</head>
+<body class="bg-white text-hs-black">
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-white border-b border-gray-200">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="block">
+        <div class="font-bold text-lg tracking-tight leading-none font-display">HOLY SMOKES</div>
+        <div class="text-xs text-hs-green tracking-widest uppercase font-semibold">BBQ Team</div>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-8">
+        <a href="/" class="text-sm font-semibold text-gray-700 hover:text-hs-green transition">Home</a>
+        <a href="/homecoming" class="text-sm font-semibold text-hs-green transition">Homecoming</a>
+        <a href="/catering" class="text-sm font-semibold text-gray-700 hover:text-hs-green transition">Catering</a>
+        <a href="/login" class="btn-primary text-sm">Team Portal</a>
+      </nav>
+
+      <button id="menu-btn" class="md:hidden p-2 rounded-lg hover:bg-gray-100" aria-label="Menu">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 px-4 py-4 space-y-3">
+      <a href="/" class="block text-sm font-semibold text-gray-700 hover:text-hs-green transition">Home</a>
+      <a href="/homecoming" class="block text-sm font-semibold text-hs-green transition">Homecoming</a>
+      <a href="/catering" class="block text-sm font-semibold text-gray-700 hover:text-hs-green transition">Catering</a>
+      <a href="/login" class="inline-block btn-primary text-sm">Team Portal</a>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="relative hero-bg text-white overflow-hidden">
+    <div class="absolute inset-0 hero-overlay"></div>
+    <div class="relative z-10 max-w-6xl mx-auto px-4 py-24 md:py-36 text-center">
+      <p class="uppercase tracking-[0.2em] text-green-100 text-sm md:text-base mb-4 font-semibold">DC Homecoming 2026</p>
+      <h1 class="font-display text-5xl md:text-7xl lg:text-8xl mb-4 tracking-tight">Holy Smokes</h1>
+      <p class="text-xl md:text-3xl font-semibold tracking-widest uppercase mb-6 text-green-100">Friday Night, October 9</p>
+      <p class="text-lg md:text-2xl text-green-50 max-w-3xl mx-auto mb-10 leading-relaxed">
+        We’re firing up the smoker for the homecoming football game. Come grab BBQ, cheer on DC, and see what Holy Smokes is all about.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="#details" class="inline-block bg-white text-hs-green font-bold px-8 py-3 rounded-lg hover:bg-gray-100 transition uppercase tracking-wide text-sm">See the Details</a>
+        <a href="https://www.instagram.com/holy.smokes26/" target="_blank" rel="noopener" class="inline-block border-2 border-white text-white font-bold px-8 py-3 rounded-lg hover:bg-white hover:text-hs-green transition uppercase tracking-wide text-sm">Follow on Instagram</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Details -->
+  <section id="details" class="py-16 md:py-24 bg-hs-cream">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="grid md:grid-cols-2 gap-10 items-start">
+        <div class="card">
+          <h2 class="text-3xl md:text-4xl font-display mb-6">What We’re Serving</h2>
+          <p class="text-lg text-gray-700 leading-relaxed mb-6">
+            Stop by our stand at the homecoming game for Holy Smokes BBQ. We’ll be serving smoked food with limited stock, so come early before we sell out.
+          </p>
+          <ul class="space-y-4 text-gray-700">
+            <li class="flex items-start gap-3">
+              <span class="text-hs-green text-xl">🔥</span>
+              <span><strong>BBQ at the game.</strong> Smoked food served Friday night during the homecoming football game.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-hs-green text-xl">📣</span>
+              <span><strong>Showcase from 12–2 PM.</strong> Find us for free samples, info about Holy Smokes, and how to get involved.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-hs-green text-xl">⚠️</span>
+              <span><strong>Limited stock.</strong> BBQ will be available while supplies last.</span>
+            </li>
+          </ul>
+          <a href="https://www.instagram.com/holy.smokes26/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 mt-8 text-hs-green font-semibold hover:underline">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Follow @holy.smokes26 for updates
+          </a>
+        </div>
+        <div class="card p-0 overflow-hidden">
+          <img src="/assets/homecoming-flyer.png" alt="Holy Smokes Homecoming flyer" class="w-full h-auto object-cover">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-hs-black text-white py-10">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div>
+        <div class="font-bold tracking-tight leading-none font-display">HOLY SMOKES</div>
+        <div class="text-xs text-gray-400 tracking-widest uppercase">BBQ Team</div>
+      </div>
+      <div class="text-sm text-gray-400 text-center md:text-right">
+        <p class="mb-1">Delaware County Christian School &bull; Newtown Square, PA</p>
+        <p class="mb-1"><a href="/" class="hover:text-white transition">Home</a> &bull; <a href="/homecoming" class="hover:text-white transition">Homecoming</a> &bull; <a href="/catering" class="hover:text-white transition">Catering</a> &bull; <a href="/login" class="hover:text-white transition">Team Portal</a></p>
+        <a href="https://www.instagram.com/holy.smokes26/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 hover:text-hs-green transition">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          Follow us on Instagram
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const menuBtn = document.getElementById('menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (menuBtn && mobileMenu) {
+      menuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+      });
+    }
+  </script>
+</body>
+</html>

@@ -36,6 +36,21 @@
     .hero-overlay {
       background-color: rgba(50, 74, 42, 0.75);
     }
+    .catering-bubble {
+      border-radius: 9999px !important;
+      animation: bubble-float 3.5s ease-in-out infinite;
+      will-change: transform;
+    }
+    .catering-bubble:hover {
+      animation-play-state: paused;
+    }
+    @keyframes bubble-float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-10px) scale(1.015); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .catering-bubble { animation: none; }
+    }
   </style>
 </head>
 <body class="bg-white text-hs-black">
@@ -172,7 +187,7 @@
         <div class="card flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h3 class="font-display text-lg">Homecoming Football Game</h3>
-            <p class="text-sm text-gray-600">DC Campus &bull; Concession Stand</p>
+            <p class="text-sm text-gray-600">Glenn Mills School</p>
           </div>
           <span class="inline-flex items-center rounded-full bg-hs-cream text-hs-green text-xs font-bold px-3 py-1 border border-hs-green/20">Oct 9 &bull; Limited Stock</span>
         </div>
@@ -181,7 +196,20 @@
             <h3 class="font-display text-lg">Freshman Social</h3>
             <p class="text-sm text-gray-600">DC Campus &bull; Concession Stand</p>
           </div>
+        </div>
+        <div class="card flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 class="font-display text-lg">Exclusive School Events</h3>
+            <p class="text-sm text-gray-600">DC Campus &bull; Watch this space for dates</p>
+          </div>
           <span class="inline-flex items-center rounded-full bg-hs-cream text-hs-green text-xs font-bold px-3 py-1 border border-hs-green/20">TBD</span>
+        </div>
+        <div class="card catering-bubble flex flex-col md:flex-row md:items-center justify-between gap-4 border-2 border-dashed border-hs-green/30 bg-hs-cream px-6 md:px-8 py-6">
+          <div class="text-center md:text-left">
+            <h3 class="font-display text-lg">Get Your Event Listed Here!</h3>
+            <p class="text-sm text-gray-600">Request our team to cater your occasion.</p>
+          </div>
+          <a href="/catering" class="inline-block bg-hs-green text-white font-bold px-5 py-2 rounded-full hover:bg-hs-green-light transition uppercase tracking-wide text-xs whitespace-nowrap">Request Catering</a>
         </div>
       </div>
     </div>

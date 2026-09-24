@@ -39,6 +39,26 @@
   </style>
 </head>
 <body class="bg-white text-hs-black">
+  <!-- Homecoming popup -->
+  <div id="homecoming-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div id="homecoming-modal-backdrop" class="absolute inset-0 bg-black/70"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+      <button id="homecoming-modal-close" aria-label="Close" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-hs-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="bg-hs-forest text-white text-center px-6 pt-8 pb-6">
+        <p class="uppercase tracking-[0.2em] text-green-100 text-xs mb-2 font-semibold">DC Homecoming 2026</p>
+        <h2 class="font-display text-3xl mb-2">Holy Smokes at Homecoming</h2>
+        <p class="text-green-50 leading-relaxed">
+          We're serving BBQ at the Homecoming football game on <strong>Friday, October 9</strong>. Catch our showcase with free samples on <strong>Saturday, October 10, 12–2 PM</strong>.
+        </p>
+      </div>
+      <div class="p-6 text-center">
+        <a href="/homecoming" class="inline-block bg-hs-green text-white font-bold px-6 py-3 rounded-lg hover:bg-hs-green/90 transition uppercase tracking-wide text-sm">See Homecoming Details</a>
+      </div>
+    </div>
+  </div>
+
   <!-- Announcement bar -->
   <div class="bg-hs-green text-white text-center text-sm py-2 px-4">
     Now serving smoked food at the DC concession stand for exclusive events.
@@ -154,7 +174,7 @@
             <h3 class="font-display text-lg">Homecoming Concession</h3>
             <p class="text-sm text-gray-600">DC Campus &bull; Concession Stand</p>
           </div>
-          <span class="inline-flex items-center rounded-full bg-hs-cream text-hs-green text-xs font-bold px-3 py-1 border border-hs-green/20">TBD</span>
+          <span class="inline-flex items-center rounded-full bg-hs-cream text-hs-green text-xs font-bold px-3 py-1 border border-hs-green/20">Fri, Oct 9</span>
         </div>
         <div class="card flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -202,6 +222,29 @@
   </footer>
 
   <script>
+    // Homecoming marketing popup
+    (function () {
+      const modal = document.getElementById('homecoming-modal');
+      const backdrop = document.getElementById('homecoming-modal-backdrop');
+      const closeBtn = document.getElementById('homecoming-modal-close');
+      if (!modal) return;
+      const STORAGE_KEY = 'hs-homecoming-popup-dismissed';
+      function closeModal() {
+        modal.classList.add('hidden');
+        try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+      }
+      let alreadyDismissed = false;
+      try { alreadyDismissed = sessionStorage.getItem(STORAGE_KEY) === '1'; } catch (e) {}
+      if (!alreadyDismissed) {
+        modal.classList.remove('hidden');
+      }
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+      });
+    })();
+
     const menuBtn = document.getElementById('menu-btn');
     const mobileMenu = document.getElementById('mobile-menu');
     if (menuBtn && mobileMenu) {

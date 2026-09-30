@@ -21,6 +21,13 @@ const EVENTS = [
     description: "Free samples and info about Holy Smokes. Stop by and meet the team.",
     link: "/homecoming",
   },
+  {
+    title: "Freshman Social",
+    date: "2026-10-22",
+    time: "5:30",
+    location: "Delaware County Christian School",
+    description: "We're catering the Freshman class' social!",
+  },
 ];
 // ============================================================
 

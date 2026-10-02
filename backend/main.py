@@ -106,10 +106,27 @@ async def health():
 _HERO_RE = re.compile(r"^hero(\d+)\.(jpe?g|png|webp|gif)$", re.IGNORECASE)
 
 
+def _is_web_image(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+    except OSError:
+        return False
+    ok = (
+        head.startswith(b"\xff\xd8\xff")
+        or head.startswith(b"\x89PNG")
+        or head.startswith(b"GIF8")
+        or (head[:4] == b"RIFF" and head[8:12] == b"WEBP")
+    )
+    if not ok:
+        logger.warning("Skipping hero image %s: not a JPEG/PNG/WEBP/GIF (HEIC or empty file?)", os.path.basename(path))
+    return ok
+
+
 @app.get("/api/hero-images")
 async def hero_images():
     assets_dir = os.path.join(FRONTEND_DIR, "assets")
-    names = [n for n in os.listdir(assets_dir) if _HERO_RE.match(n)]
+    names = [n for n in os.listdir(assets_dir) if _HERO_RE.match(n) and _is_web_image(os.path.join(assets_dir, n))]
     names.sort(key=lambda n: int(_HERO_RE.match(n).group(1)))
     return JSONResponse([f"/assets/{n}" for n in names], headers={"Cache-Control": "no-cache"})
 

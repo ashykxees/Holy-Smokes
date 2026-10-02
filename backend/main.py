@@ -103,6 +103,17 @@ async def health():
     return {"ok": True}
 
 
+_HERO_RE = re.compile(r"^hero(\d+)\.(jpe?g|png|webp|gif)$", re.IGNORECASE)
+
+
+@app.get("/api/hero-images")
+async def hero_images():
+    assets_dir = os.path.join(FRONTEND_DIR, "assets")
+    names = [n for n in os.listdir(assets_dir) if _HERO_RE.match(n)]
+    names.sort(key=lambda n: int(_HERO_RE.match(n).group(1)))
+    return JSONResponse([f"/assets/{n}" for n in names], headers={"Cache-Control": "no-cache"})
+
+
 def _display_name(profile: dict) -> str:
     if profile.get("nickname"):
         return profile["nickname"].strip()

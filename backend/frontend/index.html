@@ -114,11 +114,6 @@
   <!-- Hero -->
   <section class="relative text-white overflow-hidden" id="hero">
     <div class="hero-slides absolute inset-0 z-0">
-      <div class="hero-slide active" style="background-image: url('/assets/hero1.jpg')"></div>
-      <div class="hero-slide" style="background-image: url('/assets/hero2.jpg')"></div>
-      <div class="hero-slide" style="background-image: url('/assets/hero3.jpg')"></div>
-      <div class="hero-slide" style="background-image: url('/assets/hero4.jpg')"></div>
-      <div class="hero-slide" style="background-image: url('/assets/hero5.jpg')"></div>
     </div>
     <div class="absolute inset-0 hero-overlay z-0 hero-pattern"></div>
     <div class="relative z-10 max-w-6xl mx-auto px-4 py-28 md:py-40 text-center">
@@ -286,17 +281,47 @@
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
-    // Hero background slideshow
-    (function () {
-      const slides = document.querySelectorAll('.hero-slide');
+    // Hero background slideshow: shows every assets/hero#.(jpg|jpeg|png|webp|gif) in shuffled order
+    (async function () {
+      const container = document.querySelector('.hero-slides');
+      let images = [];
+      try {
+        const res = await fetch('/api/hero-images', { cache: 'no-store' });
+        if (res.ok) images = await res.json();
+      } catch (e) {}
+      if (!images.length) images = ['/assets/hero1.jpg'];
+
+      function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      const slides = shuffle(images).map((src, i) => {
+        const el = document.createElement('div');
+        el.className = 'hero-slide' + (i === 0 ? ' active' : '');
+        el.style.backgroundImage = `url('${src}')`;
+        container.appendChild(el);
+        return el;
+      });
       if (slides.length < 2) return;
-      let current = 0;
+
+      let order = slides.map((_, i) => i);
+      let pos = 0;
       function nextSlide() {
-        slides[current].classList.remove('active');
-        current = (current + 1) % slides.length;
-        slides[current].classList.add('active');
-        const delay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
-        setTimeout(nextSlide, delay);
+        const prev = order[pos];
+        slides[prev].classList.remove('active');
+        pos++;
+        if (pos >= order.length) {
+          order = shuffle(order);
+          if (order[0] === prev) order.push(order.shift());
+          pos = 0;
+        }
+        slides[order[pos]].classList.add('active');
+        setTimeout(nextSlide, Math.floor(Math.random() * 3000) + 2000);
       }
       setTimeout(nextSlide, Math.floor(Math.random() * 3000) + 2000);
     })();

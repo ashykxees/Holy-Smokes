@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Hours | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css?v=9">
+  <script src="/js/app.js?v=13"></script>
+  <script src="/js/service-hours.js?v=1"></script>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
+  <main class="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">Service Hours</h1>
+      <p class="text-gray-500">Only you and team managers can see your hours.</p>
+    </header>
+
+    <section class="mb-6 p-6 rounded-xl bg-hs-green text-white shadow">
+      <div class="grid md:grid-cols-2 gap-6 items-center">
+        <div>
+          <div class="text-sm uppercase tracking-widest text-green-100">Your Hours</div>
+          <div class="text-5xl font-bold mt-1"><span id="my-total">0</span><span class="text-2xl font-medium text-green-100"> / <span class="quota">15</span> hrs</span></div>
+          <div class="w-full h-3 bg-white/20 rounded-full mt-4 overflow-hidden">
+            <div id="my-progress" class="h-3 bg-white rounded-full" style="width: 0%"></div>
+          </div>
+          <div id="my-remaining" class="text-sm mt-2 text-green-100">Loading...</div>
+        </div>
+        <div class="md:text-right">
+          <div class="text-sm uppercase tracking-widest text-green-100">Countdown</div>
+          <div class="text-5xl font-bold mt-1" id="days-left">--</div>
+          <div class="text-sm mt-2 text-green-100" id="deadline-text"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-6">
+      <h2 class="text-lg font-semibold mb-4">Your Logged Hours</h2>
+      <ul id="my-entries" class="space-y-2">
+        <li class="text-gray-500 text-sm">Loading...</li>
+      </ul>
+    </section>
+
+    <section id="manager-section" class="card hidden">
+      <h2 class="text-lg font-semibold mb-1">Add Service Hours</h2>
+      <p class="text-sm text-gray-500 mb-4">Managers only. Add hours to one team member at a time.</p>
+      <form id="hours-form" class="space-y-4">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Team Member</label>
+            <select id="hours-user" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+              <option value="">Select a person...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hours</label>
+            <input id="hours-amount" type="number" min="0.25" max="24" step="0.25" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+          </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date Served</label>
+            <input id="hours-date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input id="hours-description" type="text" placeholder="e.g. Homecoming setup" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Add Hours</button>
+        <span id="hours-status" class="text-sm ml-2"></span>
+      </form>
+      <div id="selected-summary" class="mt-6 hidden">
+        <h3 class="font-semibold mb-2" id="selected-name"></h3>
+        <ul id="selected-entries" class="space-y-2"></ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

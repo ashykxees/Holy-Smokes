@@ -151,6 +151,8 @@ async def init_db():
     await _migrate_inbound_emails(db)
     await _migrate_outbound_emails(db)
     await _migrate_events(db)
+    await _migrate_task_completions(db)
+    await _migrate_service_hours(db)
     await db.commit()
     await db.close()
 
@@ -241,6 +243,49 @@ async def _migrate_outbound_emails(db):
             inbound_email_id INTEGER,
             sent_at TEXT NOT NULL,
             FOREIGN KEY (inbound_email_id) REFERENCES inbound_emails(id) ON DELETE SET NULL
+        )"""
+    )
+
+
+async def _migrate_task_completions(db):
+    """Per-user task completions so every member can complete team-wide tasks and earn EXP."""
+    async with db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='task_completions'"
+    ) as cursor:
+        exists = await cursor.fetchone()
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS task_completions (
+            task_id INTEGER NOT NULL,
+            user_email TEXT NOT NULL,
+            exp_awarded INTEGER NOT NULL DEFAULT 0,
+            completed_at TEXT NOT NULL,
+            PRIMARY KEY (task_id, user_email)
+        )"""
+    )
+    if exists:
+        return
+    # Carry over existing completions; team tasks no longer use the shared completed flag.
+    await db.execute(
+        """INSERT OR IGNORE INTO task_completions (task_id, user_email, exp_awarded, completed_at)
+           SELECT id, CASE WHEN assigned_to = 'all' THEN completed_by ELSE assigned_to END,
+                  exp, COALESCE(completed_at, created_at)
+           FROM tasks WHERE completed = 1 AND completed_by IS NOT NULL"""
+    )
+    await db.execute(
+        "UPDATE tasks SET completed = 0, completed_by = NULL, completed_at = NULL WHERE assigned_to = 'all'"
+    )
+
+
+async def _migrate_service_hours(db):
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS service_hours (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT NOT NULL,
+            hours REAL NOT NULL,
+            service_date TEXT,
+            description TEXT,
+            added_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
         )"""
     )
 

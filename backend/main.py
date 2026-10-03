@@ -356,31 +356,44 @@ async def list_users(user: dict = Depends(get_current_user)):
 @app.get("/api/tasks")
 async def list_tasks(request: Request, user: dict = Depends(get_current_user)):
     database = await db.get_db()
-    completed = request.query_params.get("completed")
-    if completed is not None:
-        completed_flag = completed.lower() in ("1", "true", "yes")
-        completed_int = 1 if completed_flag else 0
-        if user.get("is_manager"):
-            cursor = await database.execute(
-                "SELECT * FROM tasks WHERE completed = ? ORDER BY completed_at DESC, created_at DESC",
-                (completed_int,),
-            )
-        else:
-            cursor = await database.execute(
-                "SELECT * FROM tasks WHERE (assigned_to = ? OR assigned_to = 'all') AND completed = ? ORDER BY completed_at DESC, created_at DESC",
-                (user["email"], completed_int),
-            )
+    if user.get("is_manager"):
+        cursor = await database.execute("SELECT * FROM tasks ORDER BY created_at DESC")
     else:
-        if user.get("is_manager"):
-            cursor = await database.execute("SELECT * FROM tasks ORDER BY created_at DESC")
-        else:
-            cursor = await database.execute(
-                "SELECT * FROM tasks WHERE assigned_to = ? OR assigned_to = 'all' ORDER BY created_at DESC",
-                (user["email"],),
-            )
-    rows = await cursor.fetchall()
+        cursor = await database.execute(
+            "SELECT * FROM tasks WHERE assigned_to = ? OR assigned_to = 'all' ORDER BY created_at DESC",
+            (user["email"],),
+        )
+    tasks = [dict(r) for r in await cursor.fetchall()]
+    cursor = await database.execute(
+        """SELECT c.task_id, c.user_email, c.completed_at, COALESCE(u.name, c.user_email) AS name
+           FROM task_completions c LEFT JOIN users u ON u.email = c.user_email
+           ORDER BY c.completed_at"""
+    )
+    completions: dict = {}
+    for r in await cursor.fetchall():
+        completions.setdefault(r["task_id"], []).append(dict(r))
     await database.close()
-    return [dict(r) for r in rows]
+
+    completed_param = request.query_params.get("completed")
+    want_completed = None if completed_param is None else completed_param.lower() in ("1", "true", "yes")
+    result = []
+    for t in tasks:
+        comps = completions.get(t["id"], [])
+        t["completions"] = comps
+        if t["assigned_to"] == "all":
+            mine = next((c for c in comps if c["user_email"] == user["email"]), None)
+            t["completed"] = 1 if mine else 0
+            t["completed_by"] = user["email"] if mine else None
+            t["completed_at"] = mine["completed_at"] if mine else None
+            if want_completed and user.get("is_manager") and comps:
+                t["completed"] = 1
+                t["completed_by"] = ", ".join(c["name"] for c in comps)
+                t["completed_at"] = comps[-1]["completed_at"]
+        if want_completed is None or bool(t["completed"]) == want_completed:
+            result.append(t)
+    if want_completed:
+        result.sort(key=lambda t: t.get("completed_at") or "", reverse=True)
+    return result
 
 
 @app.post("/api/tasks")
@@ -428,26 +441,39 @@ async def complete_task(task_id: int, request: Request, user: dict = Depends(get
         await database.close()
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not assigned to this task")
 
-    completed_at = db.now_iso() if completed else None
-    completed_by = user["email"] if completed else None
-    await database.execute(
-        "UPDATE tasks SET completed = ?, completed_by = ?, completed_at = ? WHERE id = ?",
-        (int(completed), completed_by, completed_at, task_id),
-    )
-
-    # Award or revoke EXP when completion status changes.
-    was_completed = bool(row["completed"])
+    is_team_task = row["assigned_to"] == "all"
+    earner = user["email"] if is_team_task else row["assigned_to"]
     exp_amount = int(row["exp"] or 0)
-    if completed and not was_completed and exp_amount > 0:
+    now = db.now_iso()
+
+    if not is_team_task:
+        await database.execute(
+            "UPDATE tasks SET completed = ?, completed_by = ?, completed_at = ? WHERE id = ?",
+            (int(completed), user["email"] if completed else None, now if completed else None, task_id),
+        )
+
+    cursor = await database.execute(
+        "SELECT exp_awarded FROM task_completions WHERE task_id = ? AND user_email = ?",
+        (task_id, earner),
+    )
+    existing = await cursor.fetchone()
+    if completed and not existing:
+        await database.execute(
+            "INSERT INTO task_completions (task_id, user_email, exp_awarded, completed_at) VALUES (?, ?, ?, ?)",
+            (task_id, earner, exp_amount, now),
+        )
         await database.execute(
             "UPDATE users SET exp_total = exp_total + ? WHERE email = ?",
-            (exp_amount, user["email"]),
+            (exp_amount, earner),
         )
-    elif not completed and was_completed and exp_amount > 0:
-        earner = row["completed_by"] or user["email"]
+    elif not completed and existing:
+        await database.execute(
+            "DELETE FROM task_completions WHERE task_id = ? AND user_email = ?",
+            (task_id, earner),
+        )
         await database.execute(
             "UPDATE users SET exp_total = MAX(0, exp_total - ?) WHERE email = ?",
-            (exp_amount, earner),
+            (int(existing["exp_awarded"] or 0), earner),
         )
 
     await database.commit()
@@ -459,6 +485,68 @@ async def complete_task(task_id: int, request: Request, user: dict = Depends(get
 async def delete_task(task_id: int, user: dict = Depends(require_manager)):
     database = await db.get_db()
     await database.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    await database.execute("DELETE FROM task_completions WHERE task_id = ?", (task_id,))
+    await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
+@app.get("/api/service-hours/me")
+async def my_service_hours(user: dict = Depends(get_current_user)):
+    return await _service_hours_for(user["email"])
+
+
+@app.get("/api/service-hours/user")
+async def user_service_hours(email: str, user: dict = Depends(require_manager)):
+    return await _service_hours_for(email.strip().lower())
+
+
+async def _service_hours_for(email: str) -> dict:
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT s.id, s.hours, s.service_date, s.description, s.created_at,
+                  COALESCE(u.name, s.added_by) AS added_by_name
+           FROM service_hours s LEFT JOIN users u ON u.email = s.added_by
+           WHERE s.user_email = ? ORDER BY COALESCE(s.service_date, s.created_at) DESC, s.id DESC""",
+        (email,),
+    )
+    entries = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return {"email": email, "total": round(sum(e["hours"] for e in entries), 2), "entries": entries}
+
+
+@app.post("/api/service-hours")
+async def add_service_hours(request: Request, user: dict = Depends(require_manager)):
+    data = await request.json()
+    email = (data.get("user_email") or "").strip().lower()
+    try:
+        hours = round(float(data.get("hours")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Hours must be a number")
+    if hours <= 0 or hours > 24:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Hours must be between 0 and 24")
+    service_date = (data.get("service_date") or "").strip() or None
+    if service_date and not re.match(r"^\d{4}-\d{2}-\d{2}$", service_date):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="A valid date is required")
+    description = (data.get("description") or "").strip() or None
+    database = await db.get_db()
+    cursor = await database.execute("SELECT 1 FROM users WHERE email = ? AND is_approved = 1", (email,))
+    if not await cursor.fetchone():
+        await database.close()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    await database.execute(
+        "INSERT INTO service_hours (user_email, hours, service_date, description, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (email, hours, service_date, description, user["email"], db.now_iso()),
+    )
+    await database.commit()
+    await database.close()
+    return await _service_hours_for(email)
+
+
+@app.delete("/api/service-hours/{entry_id}")
+async def delete_service_hours(entry_id: int, user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    await database.execute("DELETE FROM service_hours WHERE id = ?", (entry_id,))
     await database.commit()
     await database.close()
     return {"ok": True}

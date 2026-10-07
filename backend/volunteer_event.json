@@ -6,16 +6,30 @@
   "slots": [
     {
       "id": "after-school",
-      "time": "2:55pm - 5:45ish",
-      "location": "Right after school",
+      "time": "2:55pm - ~5:45pm",
+      "location": "Student Union",
       "min_volunteers": 3,
-      "max_volunteers": 4
+      "max_volunteers": 5
     },
     {
       "id": "glen-mills",
       "time": "6:30pm",
       "location": "Glen Mills School",
       "min_volunteers": 3,
+      "max_volunteers": 5
+    },
+    {
+      "id": "Saturday Shift 1",
+      "time": "Saturday 11am",
+      "location": "Softball Field",
+      "min_volunteers": 2,
+      "max_volunteers": 4
+    },
+    {
+      "id": "Saturday Shift 2",
+      "time": "Saturday 12pm",
+      "location": "Softball Field",
+      "min_volunteers": 2,
       "max_volunteers": 4
     }
   ]

@@ -22,7 +22,7 @@ async function fetchJSON(url, options = {}) {
   const res = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
   if (res.status === 401) {
     if (!isAuthPage()) {
-      window.location.href = '/login';
+      goToLogin();
     }
     return null;
   }
@@ -31,6 +31,19 @@ async function fetchJSON(url, options = {}) {
     throw new Error(data.detail || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+function goToLogin() {
+  const next = window.location.pathname + window.location.search;
+  window.location.href = '/login?next=' + encodeURIComponent(next);
+}
+
+function afterLoginPath(fallback) {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    return next;
+  }
+  return fallback;
 }
 
 function isAuthPage() {
@@ -69,7 +82,7 @@ async function initAuth() {
     }
 
     if (loginPage && user) {
-      window.location.href = user.onboarding_completed ? '/dashboard' : '/onboarding';
+      window.location.href = user.onboarding_completed ? afterLoginPath('/dashboard') : '/onboarding';
       return;
     }
     if (user && !user.onboarding_completed && !onboardingPage) {
@@ -84,7 +97,7 @@ async function initAuth() {
     if (window.onAuthReady) window.onAuthReady(user);
   } catch (err) {
     if (!loginPage && !onboardingPage && !awaitingPage) {
-      window.location.href = '/login';
+      goToLogin();
     } else if (window.onAuthReady) {
       window.onAuthReady(null);
     }
@@ -166,6 +179,10 @@ function buildNav(user) {
       <a href="/service-hours" class="${linkClass('/service-hours')}">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Service Hours
+      </a>
+      <a href="/volunteer" class="${linkClass('/volunteer')}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Volunteer
       </a>
       ${managerLink}
       ${adminLink}

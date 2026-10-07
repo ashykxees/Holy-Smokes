@@ -153,6 +153,7 @@ async def init_db():
     await _migrate_events(db)
     await _migrate_task_completions(db)
     await _migrate_service_hours(db)
+    await _migrate_volunteer_signups(db)
     await db.commit()
     await db.close()
 
@@ -286,6 +287,18 @@ async def _migrate_service_hours(db):
             description TEXT,
             added_by TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )"""
+    )
+
+
+async def _migrate_volunteer_signups(db):
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS volunteer_signups (
+            event_id TEXT NOT NULL,
+            slot_id TEXT NOT NULL,
+            user_email TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (event_id, slot_id, user_email)
         )"""
     )
 

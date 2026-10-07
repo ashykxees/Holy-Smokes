@@ -491,6 +491,72 @@ async def delete_task(task_id: int, user: dict = Depends(require_manager)):
     return {"ok": True}
 
 
+# Edit backend/volunteer_event.json to change the volunteer event, shifts, and limits.
+VOLUNTEER_EVENT_PATH = os.path.join(os.path.dirname(__file__), "volunteer_event.json")
+
+
+def _load_volunteer_event() -> dict:
+    with open(VOLUNTEER_EVENT_PATH) as f:
+        return json.load(f)
+
+
+@app.get("/api/volunteer")
+async def get_volunteer_event(user: dict = Depends(get_current_user)):
+    event = _load_volunteer_event()
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT v.slot_id, v.user_email, COALESCE(u.name, v.user_email) AS name
+           FROM volunteer_signups v LEFT JOIN users u ON u.email = v.user_email
+           WHERE v.event_id = ? ORDER BY v.created_at""",
+        (event["id"],),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    for slot in event["slots"]:
+        signups = [r for r in rows if r["slot_id"] == slot["id"]]
+        slot["volunteers"] = [r["name"] for r in signups]
+        slot["signed_up"] = any(r["user_email"] == user["email"] for r in signups)
+    return event
+
+
+@app.post("/api/volunteer/{slot_id}")
+async def volunteer_sign_up(slot_id: str, user: dict = Depends(get_current_user)):
+    event = _load_volunteer_event()
+    slot = next((s for s in event["slots"] if s["id"] == slot_id), None)
+    if not slot:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Shift not found")
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT user_email FROM volunteer_signups WHERE event_id = ? AND slot_id = ?",
+        (event["id"], slot_id),
+    )
+    emails = [r["user_email"] for r in await cursor.fetchall()]
+    if user["email"] not in emails:
+        if len(emails) >= int(slot["max_volunteers"]):
+            await database.close()
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="This shift is full")
+        await database.execute(
+            "INSERT INTO volunteer_signups (event_id, slot_id, user_email, created_at) VALUES (?, ?, ?, ?)",
+            (event["id"], slot_id, user["email"], db.now_iso()),
+        )
+        await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
+@app.delete("/api/volunteer/{slot_id}")
+async def volunteer_cancel(slot_id: str, user: dict = Depends(get_current_user)):
+    event = _load_volunteer_event()
+    database = await db.get_db()
+    await database.execute(
+        "DELETE FROM volunteer_signups WHERE event_id = ? AND slot_id = ? AND user_email = ?",
+        (event["id"], slot_id, user["email"]),
+    )
+    await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
 @app.get("/api/service-hours/me")
 async def my_service_hours(user: dict = Depends(get_current_user)):
     return await _service_hours_for(user["email"])

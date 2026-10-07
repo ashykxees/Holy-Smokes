@@ -1,0 +1,22 @@
+{
+  "id": "homecoming-2026",
+  "title": "Homecoming Volunteer Sign Up",
+  "date": "2026-10-09",
+  "description": "Help the Holy Smokes team serve BBQ at Homecoming. Pick a shift below.",
+  "slots": [
+    {
+      "id": "after-school",
+      "time": "2:55pm - 5:45ish",
+      "location": "Right after school",
+      "min_volunteers": 3,
+      "max_volunteers": 4
+    },
+    {
+      "id": "glen-mills",
+      "time": "6:30pm",
+      "location": "Glen Mills School",
+      "min_volunteers": 3,
+      "max_volunteers": 4
+    }
+  ]
+}

@@ -4,13 +4,6 @@
   "date": "2026-10-09",
   "description": "Help the Holy Smokes team serve BBQ at Homecoming. Pick a shift below.",
   "slots": [
-      {
-      "id": "after-school",
-      "time": "Thursday 2:55pm - 3:45pm",
-      "location": "Student Union",
-      "min_volunteers": 3,
-      "max_volunteers": 5
-    },
     {
       "id": "after-school",
       "time": "Friday 2:55pm - ~5:45pm",

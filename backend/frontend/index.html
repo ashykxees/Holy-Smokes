@@ -210,6 +210,7 @@
     </div>
   </footer>
 
+  <script src="/js/hero-focus.js"></script>
   <script>
     const menuBtn = document.getElementById('menu-btn');
     const mobileMenu = document.getElementById('mobile-menu');
@@ -260,6 +261,7 @@
         const el = document.createElement('div');
         el.className = 'hero-slide' + (i === 0 ? ' active' : '');
         el.style.backgroundImage = `url('${src}')`;
+        el.style.backgroundPosition = HERO_FOCUS[src.split('/').pop()] || HERO_FOCUS_DEFAULT;
         container.appendChild(el);
         return el;
       });

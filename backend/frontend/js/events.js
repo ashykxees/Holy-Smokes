@@ -11,7 +11,6 @@ const EVENTS = [
     time: "Game Night",
     location: "Glen Mills School",
     description: "We're serving Holy Smokes BBQ at the homecoming game. Limited stock — come early!",
-    link: "/homecoming",
   },
   {
     title: "Homecoming Showcase",
@@ -19,7 +18,6 @@ const EVENTS = [
     time: "12:00 PM – 2:00 PM",
     location: "DC Softball Field",
     description: "Free samples and info about Holy Smokes. Stop by and meet the team.",
-    link: "/homecoming",
   },
   {
     title: "Freshman Social",

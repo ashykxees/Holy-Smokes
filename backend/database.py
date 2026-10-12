@@ -80,6 +80,7 @@ def _schema() -> str:
         CREATE TABLE IF NOT EXISTS catering_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            email TEXT,
             phone TEXT NOT NULL,
             event_type TEXT NOT NULL,
             guests INTEGER NOT NULL,
@@ -154,6 +155,7 @@ async def init_db():
     await _migrate_task_completions(db)
     await _migrate_service_hours(db)
     await _migrate_volunteer_signups(db)
+    await _migrate_catering_requests(db)
     await db.commit()
     await db.close()
 
@@ -289,6 +291,14 @@ async def _migrate_service_hours(db):
             created_at TEXT NOT NULL
         )"""
     )
+
+
+async def _migrate_catering_requests(db):
+    """Add columns introduced to catering_requests after the initial deploy."""
+    async with db.execute("PRAGMA table_info(catering_requests)") as cursor:
+        columns = {row["name"] for row in await cursor.fetchall()}
+    if "email" not in columns:
+        await db.execute("ALTER TABLE catering_requests ADD COLUMN email TEXT")
 
 
 async def _migrate_volunteer_signups(db):

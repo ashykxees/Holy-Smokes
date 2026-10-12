@@ -858,6 +858,18 @@ async def admin_email_log(user: dict = Depends(require_owner)):
 
 CATERING_EMAIL = "business@holysmokes.cc"
 
+_CATERING_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+
+
+def _normalize_us_phone(phone: str) -> str:
+    """Return the phone as (XXX) XXX-XXXX, or "" if it is not a valid US number."""
+    digits = re.sub(r"\D", "", phone)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10 or digits[0] in "01" or digits[3] in "01":
+        return ""
+    return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+
 _CATERING_ALLOWED_ITEMS = {
     "Pulled Pork", "Ribs", "Mac n Cheese", "Special Request"
 }
@@ -936,6 +948,7 @@ async def _send_mailgun_email(api_key: str, domain: str, from_email: str, to_ema
 
 def _format_catering_email(data: dict) -> tuple[str, str, str]:
     safe_name = html.escape(data["name"])
+    safe_email = html.escape(data["email"])
     safe_phone = html.escape(data["phone"])
     safe_event = html.escape(data["event_type"])
     safe_guests = html.escape(str(data["guests"]))
@@ -949,6 +962,7 @@ def _format_catering_email(data: dict) -> tuple[str, str, str]:
   <h2 style="color: #324A2A; text-transform: uppercase; letter-spacing: 0.05em;">New Catering Request</h2>
   <table style="border-collapse: collapse; max-width: 600px;">
     <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Name</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_name}</td></tr>
+    <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Email</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;"><a href="mailto:{safe_email}">{safe_email}</a></td></tr>
     <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Phone</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_phone}</td></tr>
     <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Event Type</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_event}</td></tr>
     <tr><td style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">Expected Guests</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{safe_guests}</td></tr>
@@ -962,6 +976,7 @@ def _format_catering_email(data: dict) -> tuple[str, str, str]:
     plain_body = f"""New Catering Request
 
 Name: {data['name']}
+Email: {data['email']}
 Phone: {data['phone']}
 Event Type: {data['event_type']}
 Expected Guests: {data['guests']}
@@ -979,6 +994,7 @@ Submitted via holysmokes.cc
 async def catering_request(request: Request):
     data = await request.json()
     name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
     phone = (data.get("phone") or "").strip()
     event_type = (data.get("event_type") or "").strip()
     guests_raw = data.get("guests")
@@ -988,8 +1004,15 @@ async def catering_request(request: Request):
 
     if not name:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Name is required")
+    if not email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email is required")
+    if len(email) > 254 or not _CATERING_EMAIL_RE.match(email):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Enter a valid email address")
     if not phone:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Phone number is required")
+    phone = _normalize_us_phone(phone)
+    if not phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Enter a valid 10-digit phone number")
     if event_type not in _CATERING_ALLOWED_EVENTS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Select a valid event type")
     try:
@@ -1010,9 +1033,9 @@ async def catering_request(request: Request):
     database = await db.get_db()
     cursor = await database.execute(
         """INSERT INTO catering_requests
-               (name, phone, event_type, guests, event_date, items, description, email_sent, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (name, phone, event_type, guests, event_date, items_json, description or None, 0, db.now_iso()),
+               (name, email, phone, event_type, guests, event_date, items, description, email_sent, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, email, phone, event_type, guests, event_date, items_json, description or None, 0, db.now_iso()),
     )
     request_id = cursor.lastrowid
     await database.commit()
@@ -1020,6 +1043,7 @@ async def catering_request(request: Request):
 
     subject, html_body, _plain_body = _format_catering_email({
         "name": name,
+        "email": email,
         "phone": phone,
         "event_type": event_type,
         "guests": guests,

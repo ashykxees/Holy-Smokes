@@ -33,6 +33,18 @@
     .hero-slide.active {
       opacity: 1;
     }
+    .hero-slide-fill {
+      position: absolute;
+      inset: -40px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(24px);
+    }
+    .hero-slide-photo {
+      position: absolute;
+      inset: 0;
+      background-repeat: no-repeat;
+    }
     .hero-overlay {
       background-color: rgba(50, 74, 42, 0.75);
     }
@@ -210,7 +222,7 @@
     </div>
   </footer>
 
-  <script src="/js/hero-focus.js"></script>
+  <script src="/js/hero-focus.js?v=2"></script>
   <script>
     const menuBtn = document.getElementById('menu-btn');
     const mobileMenu = document.getElementById('mobile-menu');
@@ -241,7 +253,7 @@
       if (!images.length) images = ['/assets/hero1.jpg'];
       const loaded = await Promise.all(images.map(src => new Promise(resolve => {
         const img = new Image();
-        img.onload = () => resolve(src);
+        img.onload = () => resolve({ src, ratio: img.naturalWidth / img.naturalHeight });
         img.onerror = () => resolve(null);
         img.src = src;
       })));
@@ -257,14 +269,36 @@
         return a;
       }
 
-      const slides = shuffle(images).map((src, i) => {
+      const framed = [];
+      const slides = shuffle(images).map(({ src, ratio }, i) => {
+        const focus = { ...HERO_FOCUS_DEFAULT, ...HERO_FOCUS[src.split('/').pop()] };
         const el = document.createElement('div');
         el.className = 'hero-slide' + (i === 0 ? ' active' : '');
-        el.style.backgroundImage = `url('${src}')`;
-        el.style.backgroundPosition = HERO_FOCUS[src.split('/').pop()] || HERO_FOCUS_DEFAULT;
+        const fill = document.createElement('div');
+        fill.className = 'hero-slide-fill';
+        fill.style.backgroundImage = `url('${src}')`;
+        const photo = document.createElement('div');
+        photo.className = 'hero-slide-photo';
+        photo.style.backgroundImage = `url('${src}')`;
+        photo.style.backgroundPosition = focus.position;
+        el.appendChild(fill);
+        el.appendChild(photo);
         container.appendChild(el);
+        framed.push({ photo, ratio, show: focus.show });
         return el;
       });
+
+      // Cover the banner, but never zoom in so far that less than `show` of the photo's height is visible.
+      function frameSlides() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        framed.forEach(({ photo, ratio, show }) => {
+          const coverHeight = Math.max(h, w / ratio);
+          photo.style.backgroundSize = coverHeight > h / show ? `auto ${100 / show}%` : 'cover';
+        });
+      }
+      frameSlides();
+      window.addEventListener('resize', frameSlides);
       if (slides.length < 2) return;
 
       let order = slides.map((_, i) => i);

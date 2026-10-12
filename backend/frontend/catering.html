@@ -33,6 +33,13 @@
       color: var(--hs-green);
       margin-bottom: 1rem;
     }
+    .food-option:hover,
+    input:checked + .food-option {
+      border-color: var(--hs-green);
+    }
+    input:focus-visible + .food-option {
+      box-shadow: 0 0 0 2px rgba(50, 74, 42, 0.3);
+    }
     .form-step::after {
       content: "";
       flex: 1;
@@ -195,19 +202,19 @@
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <label class="cursor-pointer">
               <input type="checkbox" name="items" value="Pulled Pork" class="peer sr-only">
-              <span class="block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition hover:border-hs-green peer-checked:border-hs-green peer-checked:bg-hs-green peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2">Pulled Pork</span>
+              <span class="food-option block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition">Pulled Pork</span>
             </label>
             <label class="cursor-pointer">
               <input type="checkbox" name="items" value="Ribs" class="peer sr-only">
-              <span class="block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition hover:border-hs-green peer-checked:border-hs-green peer-checked:bg-hs-green peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2">Ribs</span>
+              <span class="food-option block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition">Ribs</span>
             </label>
             <label class="cursor-pointer">
               <input type="checkbox" name="items" value="Mac n Cheese" class="peer sr-only">
-              <span class="block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition hover:border-hs-green peer-checked:border-hs-green peer-checked:bg-hs-green peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2">Mac n Cheese</span>
+              <span class="food-option block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition">Mac n Cheese</span>
             </label>
             <label class="cursor-pointer sm:col-span-3">
               <input type="checkbox" name="items" value="Special Request" class="peer sr-only">
-              <span class="block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition hover:border-hs-green peer-checked:border-hs-green peer-checked:bg-hs-green peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2">Special Request (describe below)</span>
+              <span class="food-option block text-center text-sm font-semibold border-2 border-gray-200 rounded-lg px-3 py-3 transition">Special Request (describe below)</span>
             </label>
           </div>
         </fieldset>

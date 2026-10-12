@@ -856,6 +856,8 @@ async def admin_email_log(user: dict = Depends(require_owner)):
     return rows
 
 
+CATERING_EMAIL = "business@holysmokes.cc"
+
 _CATERING_ALLOWED_ITEMS = {
     "Pulled Pork", "Ribs", "Mac n Cheese", "Special Request"
 }
@@ -1016,10 +1018,7 @@ async def catering_request(request: Request):
     await database.commit()
     await database.close()
 
-    from_email = os.environ.get("SMTP_FROM", "catering@holysmokes.cc")
-    to_email = os.environ.get("SMTP_TO", "catering@holysmokes.cc")
-
-    subject, html_body, plain_body = _format_catering_email({
+    subject, html_body, _plain_body = _format_catering_email({
         "name": name,
         "phone": phone,
         "event_type": event_type,
@@ -1030,52 +1029,25 @@ async def catering_request(request: Request):
     })
 
     async def _try_send_email() -> bool:
-        sendgrid_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SMTP_PASS")
-        if sendgrid_key and (
-            os.environ.get("SENDGRID_API_KEY")
-            or os.environ.get("SMTP_HOST") == "smtp.sendgrid.net"
-        ):
-            await _send_sendgrid_email(sendgrid_key, from_email, to_email, subject, plain_body, html_body)
-            return True
-
-        mailgun_key = os.environ.get("MAILGUN_API_KEY") or os.environ.get("SMTP_PASS")
-        mailgun_domain = os.environ.get("MAILGUN_DOMAIN") or os.environ.get("MAILGUN_FROM_DOMAIN")
-        if mailgun_key and mailgun_domain:
-            await _send_mailgun_email(mailgun_key, mailgun_domain, from_email, to_email, subject, plain_body, html_body)
-            return True
-
-        host = os.environ.get("SMTP_HOST")
-        port = int(os.environ.get("SMTP_PORT", "587"))
-        username = os.environ.get("SMTP_USER")
-        password = os.environ.get("SMTP_PASS")
-
-        if not host:
+        refresh = (
+            os.environ.get("ZOHO_BUSINESS_REFRESH_TOKEN")
+            or os.environ.get("ZOHO_REFRESH_TOKEN")
+            or ""
+        )
+        if not refresh:
+            print("Catering email not sent: ZOHO_BUSINESS_REFRESH_TOKEN is not set")
             return False
-
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = from_email
-        msg["To"] = to_email
-        msg["Reply-To"] = from_email
-        msg.set_content(plain_body)
-        msg.add_alternative(html_body, subtype="html")
-
-        start_tls_env = os.environ.get("SMTP_STARTTLS", "").lower()
-        use_tls = port == 465 or start_tls_env == "tls"
-        start_tls = not use_tls and (start_tls_env in ("true", "1") or port == 587)
-
-        send_kwargs = {
-            "hostname": host,
-            "port": port,
-            "use_tls": use_tls,
-            "start_tls": start_tls,
-            "timeout": 20,
-        }
-        if username and password:
-            send_kwargs["username"] = username
-            send_kwargs["password"] = password
-
-        await aiosmtplib.send(msg, **send_kwargs)
+        access_token = await asyncio.to_thread(_zoho_access_token_from_refresh, refresh)
+        account_id = await asyncio.to_thread(_zoho_find_account_id, access_token, CATERING_EMAIL)
+        await asyncio.to_thread(
+            _send_zoho_email_api_sync,
+            CATERING_EMAIL,
+            CATERING_EMAIL,
+            subject,
+            html_body,
+            access_token,
+            account_id,
+        )
         return True
 
     email_sent = False
@@ -1298,11 +1270,14 @@ def _zoho_refresh_token_for_user(user: dict) -> str:
 
 
 def _zoho_access_token(user: dict) -> str:
-    refresh = _zoho_refresh_token_for_user(user)
+    return _zoho_access_token_from_refresh(_zoho_refresh_token_for_user(user))
+
+
+def _zoho_access_token_from_refresh(refresh: str) -> str:
     client_id = os.environ.get("ZOHO_CLIENT_ID")
     client_secret = os.environ.get("ZOHO_CLIENT_SECRET")
     if not refresh or not client_id or not client_secret:
-        raise Exception("Zoho OAuth not configured for this user")
+        raise Exception("Zoho OAuth is not configured")
 
     url = f"{_zoho_accounts_url()}/token"
     params = {

@@ -161,9 +161,13 @@
         <fieldset>
           <legend class="form-step w-full">Your Info</legend>
           <div class="grid md:grid-cols-2 gap-5">
-            <div>
+            <div class="md:col-span-2">
               <label for="name" class="field-label">Name</label>
               <input id="name" name="name" type="text" required autocomplete="name" class="field" placeholder="Jane Doe">
+            </div>
+            <div>
+              <label for="email" class="field-label">Email</label>
+              <input id="email" name="email" type="email" required autocomplete="email" class="field" placeholder="jane@example.com">
             </div>
             <div>
               <label for="phone" class="field-label">Phone Number</label>
@@ -296,9 +300,24 @@
       formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
+    function isValidEmail(email) {
+      return /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email);
+    }
+
+    function isValidPhone(phone) {
+      let digits = phone.replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) {
+        digits = digits.slice(1);
+      }
+      return digits.length === 10 && !'01'.includes(digits[0]) && !'01'.includes(digits[3]);
+    }
+
     function validate(data) {
       if (!data.name) return 'Please enter your name.';
+      if (!data.email) return 'Please enter your email.';
+      if (!isValidEmail(data.email)) return 'Please enter a valid email address.';
       if (!data.phone) return 'Please enter a phone number.';
+      if (!isValidPhone(data.phone)) return 'Please enter a valid 10-digit phone number.';
       if (!data.event_type) return 'Please choose an event type.';
       if (!data.event_date) return 'Please pick an event date.';
       if (!(data.guests >= 1)) return 'Please enter how many guests you expect.';
@@ -312,6 +331,7 @@
 
       const data = {
         name: form.name.value.trim(),
+        email: form.email.value.trim(),
         phone: form.phone.value.trim(),
         event_type: form.event_type.value,
         guests: parseInt(form.guests.value, 10),

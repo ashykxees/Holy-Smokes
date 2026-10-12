@@ -19,6 +19,7 @@ async function loadRequests() {
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
           <div>
             <h3 class="font-semibold text-lg">${escapeHtml(r.name)}</h3>
+            ${r.email ? `<p class="text-sm"><a href="mailto:${escapeHtml(r.email)}" class="text-hs-green hover:underline">${escapeHtml(r.email)}</a></p>` : ''}
             <p class="text-sm text-gray-600">${escapeHtml(r.phone)} &bull; ${escapeHtml(r.event_type)} &bull; ${r.guests} guests &bull; ${escapeHtml(r.event_date)}</p>
           </div>
           <div class="flex items-center gap-3">

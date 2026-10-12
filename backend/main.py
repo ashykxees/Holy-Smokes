@@ -857,7 +857,7 @@ async def admin_email_log(user: dict = Depends(require_owner)):
 
 
 _CATERING_ALLOWED_ITEMS = {
-    "Pulled Pork", "Brisket", "Ribs", "Mac n Cheese", "Special Request"
+    "Pulled Pork", "Ribs", "Mac n Cheese", "Special Request"
 }
 _CATERING_ALLOWED_EVENTS = {"Party", "Wedding", "Gathering", "Other"}
 

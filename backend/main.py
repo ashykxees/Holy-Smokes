@@ -1032,16 +1032,17 @@ async def catering_request(request: Request):
         refresh = (
             os.environ.get("ZOHO_BUSINESS_REFRESH_TOKEN")
             or os.environ.get("ZOHO_REFRESH_TOKEN")
+            or os.environ.get("ZOHO_GRIFFIN_REFRESH_TOKEN")
             or ""
         )
         if not refresh:
-            print("Catering email not sent: ZOHO_BUSINESS_REFRESH_TOKEN is not set")
+            print("Catering email not sent: no Zoho refresh token is set")
             return False
         access_token = await asyncio.to_thread(_zoho_access_token_from_refresh, refresh)
-        account_id = await asyncio.to_thread(_zoho_find_account_id, access_token, CATERING_EMAIL)
+        account_id, from_email = await asyncio.to_thread(_zoho_sender_for, access_token, CATERING_EMAIL)
         await asyncio.to_thread(
             _send_zoho_email_api_sync,
-            CATERING_EMAIL,
+            from_email,
             CATERING_EMAIL,
             subject,
             html_body,
@@ -1317,6 +1318,28 @@ def _zoho_find_account_id(access_token: str, from_email: str) -> str:
                 return account["accountId"]
 
     return accounts[0]["accountId"]
+
+
+def _zoho_sender_for(access_token: str, preferred_email: str) -> tuple[str, str]:
+    """Return (account_id, from_address), using preferred_email if the account owns it."""
+    url = _zoho_mail_api_url()
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    resp = requests.get(url, headers=headers, timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f"Failed to fetch Zoho accounts: {resp.status_code} {resp.text}")
+    accounts = resp.json().get("data", [])
+    if not accounts:
+        raise Exception("No Zoho accounts found")
+
+    preferred = preferred_email.lower()
+    for account in accounts:
+        addresses = [(account.get("mailboxAddress") or "").lower()]
+        addresses += [(entry.get("mailId") or "").lower() for entry in account.get("emailAddress", [])]
+        if preferred in addresses:
+            return account["accountId"], preferred_email
+
+    account = accounts[0]
+    return account["accountId"], account.get("mailboxAddress") or preferred_email
 
 
 def _send_zoho_email_api_sync(from_email: str, to_email: str, subject: str, html_body: str, access_token: str, account_id: str):

@@ -491,6 +491,50 @@ async def delete_task(task_id: int, user: dict = Depends(require_manager)):
     return {"ok": True}
 
 
+FEEDBACK_MAX_ANSWERS = 50
+FEEDBACK_MAX_LENGTH = 5000
+
+
+@app.post("/api/feedback")
+async def submit_feedback(request: Request, user: dict = Depends(get_current_user)):
+    data = await request.json()
+    raw_answers = data.get("answers")
+    if not isinstance(raw_answers, list) or not raw_answers or len(raw_answers) > FEEDBACK_MAX_ANSWERS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Please answer the questions")
+    answers = []
+    for item in raw_answers:
+        if not isinstance(item, dict):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid answer")
+        question = str(item.get("question") or "").strip()[:500]
+        answer = str(item.get("answer") or "").strip()[:FEEDBACK_MAX_LENGTH]
+        if question:
+            answers.append({"question": question, "answer": answer})
+    if not any(a["answer"] for a in answers):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Please answer the questions")
+    database = await db.get_db()
+    await database.execute(
+        "INSERT INTO feedback_responses (user_email, user_name, answers, created_at) VALUES (?, ?, ?, ?)",
+        (user["email"], user.get("name"), json.dumps(answers), db.now_iso()),
+    )
+    await database.commit()
+    await database.close()
+    return {"ok": True}
+
+
+@app.get("/api/feedback")
+async def list_feedback(user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT id, user_email, user_name, answers, created_at
+           FROM feedback_responses ORDER BY id DESC LIMIT 200"""
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    for row in rows:
+        row["answers"] = json.loads(row["answers"])
+    return rows
+
+
 # Edit backend/volunteer_event.json to change the volunteer event, shifts, and limits.
 VOLUNTEER_EVENT_PATH = os.path.join(os.path.dirname(__file__), "volunteer_event.json")
 

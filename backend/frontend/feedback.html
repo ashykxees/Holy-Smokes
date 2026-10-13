@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/styles.css?v=9">
   <script src="/js/app.js?v=16"></script>
-  <script src="/js/feedback.js?v=2"></script>
+  <script src="/js/feedback.js?v=3"></script>
   <style>
     .fb-question {
       padding: 1.5rem 0;
@@ -44,6 +44,17 @@
       background: #f9fafb;
       color: #6b7280;
       cursor: not-allowed;
+    }
+
+    .fb-count {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: right;
+    }
+
+    .fb-count.met {
+      color: var(--hs-green);
+      font-weight: 600;
     }
 
     .fb-choice input {

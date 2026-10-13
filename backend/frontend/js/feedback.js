@@ -14,6 +14,7 @@
 //             'choice'   - pick one of the options
 //   options:  list of choices (only for type 'choice')
 //   required: true if they must answer before submitting
+//   minWords: smallest number of words allowed (only for 'text' and 'long')
 // ---------------------------------------------------------------------------
 
 const FEEDBACK_TITLE = 'Team Post-Mortem';
@@ -44,6 +45,7 @@ const QUESTIONS = [
     help: 'When did excellence show up? What are you proud of?',
     type: 'long',
     required: true,
+    minWords: 25,
   },
   {
     id: 'why_it_worked',
@@ -51,18 +53,22 @@ const QUESTIONS = [
     help: 'What did we do differently this time? What strengths or preparation paid off?',
     type: 'long',
     required: true,
+    minWords: 25,
   },
   {
     id: 'shout_outs',
     label: 'Shout-outs',
     help: 'Which teammates stepped up, and how?',
     type: 'long',
+    required: true,
+    minWords: 15,
   },
   {
     id: 'pain_points',
     label: 'What felt hard or did not go as planned?',
     type: 'long',
     required: true,
+    minWords: 25,
   },
   {
     id: 'root_cause',
@@ -76,6 +82,8 @@ const QUESTIONS = [
     label: 'Explain the root cause',
     help: 'Keep it about growth, not blame.',
     type: 'long',
+    required: true,
+    minWords: 20,
   },
   {
     id: 'seen_before',
@@ -89,12 +97,14 @@ const QUESTIONS = [
     label: 'What would need to be different for this to go smoothly next time?',
     type: 'long',
     required: true,
+    minWords: 25,
   },
   {
     id: 'takeaway',
     label: 'What is your biggest takeaway?',
     type: 'text',
     required: true,
+    minWords: 10,
   },
 ];
 
@@ -146,7 +156,24 @@ function renderQuestions(user) {
       </label>
       ${q.help ? `<p class="text-sm text-gray-500 mt-1">${escapeHtml(q.help)}</p>` : ''}
       <div class="mt-3">${questionInputHtml(q, user)}</div>
+      ${q.minWords ? `<p id="wc-${escapeHtml(q.id)}" class="fb-count mt-2"></p>` : ''}
     </div>`).join('');
+  QUESTIONS.filter(q => q.minWords).forEach(q => {
+    const input = document.getElementById(`q-${q.id}`);
+    input.addEventListener('input', () => updateWordCount(q));
+    updateWordCount(q);
+  });
+}
+
+function countWords(text) {
+  return text.split(/\s+/).filter(word => /[a-z0-9]/i.test(word)).length;
+}
+
+function updateWordCount(q) {
+  const count = countWords(document.getElementById(`q-${q.id}`).value);
+  const counter = document.getElementById(`wc-${q.id}`);
+  counter.textContent = `${count} / ${q.minWords} words`;
+  counter.classList.toggle('met', count >= q.minWords);
 }
 
 function answerFor(q) {
@@ -163,13 +190,24 @@ async function submitFeedback(e) {
   errorEl.classList.add('hidden');
   const answers = QUESTIONS
     .filter(q => q.type !== 'name' && q.type !== 'email')
-    .map(q => ({ id: q.id, question: q.label, answer: answerFor(q), required: q.required }));
+    .map(q => ({ id: q.id, question: q.label, answer: answerFor(q), required: q.required, minWords: q.minWords }));
 
-  const missing = answers.find(a => a.required && !a.answer);
-  if (missing) {
-    errorEl.textContent = `Please answer: ${missing.question}`;
+  let problem = null;
+  for (const a of answers) {
+    if (a.required && !a.answer) {
+      problem = { id: a.id, message: `Please answer: ${a.question}` };
+      break;
+    }
+    const words = countWords(a.answer);
+    if (a.minWords && (a.required || a.answer) && words < a.minWords) {
+      problem = { id: a.id, message: `"${a.question}" needs at least ${a.minWords} words (you have ${words}).` };
+      break;
+    }
+  }
+  if (problem) {
+    errorEl.textContent = problem.message;
     errorEl.classList.remove('hidden');
-    const block = document.querySelector(`[data-question="${missing.id}"]`);
+    const block = document.querySelector(`[data-question="${problem.id}"]`);
     block.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }

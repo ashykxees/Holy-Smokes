@@ -8,6 +8,8 @@ async function onAuthReady(user) {
   await populateAssignees();
   document.getElementById('task-form').addEventListener('submit', createTask);
   document.getElementById('announcement-form').addEventListener('submit', postAnnouncement);
+  document.getElementById('exp-form').addEventListener('submit', giveExp);
+  loadExpHistory();
   document.getElementById('chat-form').addEventListener('submit', sendMessage);
   connectManagerChat(user);
 }
@@ -16,11 +18,72 @@ async function populateAssignees() {
   const users = await fetchJSON('/api/users');
   const select = document.getElementById('task-assignee');
   select.innerHTML = '<option value="all">Entire Team</option>';
+  const expSelect = document.getElementById('exp-user');
   for (const u of users) {
     const option = document.createElement('option');
     option.value = u.email;
     option.textContent = u.name;
     select.appendChild(option);
+    expSelect.appendChild(option.cloneNode(true));
+  }
+}
+
+async function giveExp(e) {
+  e.preventDefault();
+  const select = document.getElementById('exp-user');
+  const amount = parseInt(document.getElementById('exp-amount').value, 10);
+  const reason = document.getElementById('exp-reason').value.trim();
+  if (!select.value || !amount) {
+    showExpStatus('Choose a member and enter an EXP amount other than 0.', true);
+    return;
+  }
+  const name = select.options[select.selectedIndex].textContent;
+  try {
+    const result = await fetchJSON('/api/exp/adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_email: select.value, amount, reason }),
+    });
+    document.getElementById('exp-form').reset();
+    const applied = result.applied;
+    const verb = applied > 0 ? `Gave ${applied} EXP to` : `Took ${-applied} EXP from`;
+    showExpStatus(`${verb} ${name}. They now have ${result.exp_total} EXP.`, false);
+    loadExpHistory();
+  } catch (err) {
+    showExpStatus(err.message, true);
+  }
+}
+
+function showExpStatus(message, isError) {
+  const statusEl = document.getElementById('exp-status');
+  statusEl.textContent = message;
+  statusEl.classList.remove('hidden');
+  statusEl.classList.toggle('text-red-600', isError);
+  statusEl.classList.toggle('text-hs-green', !isError);
+}
+
+async function loadExpHistory() {
+  const list = document.getElementById('exp-history');
+  try {
+    const rows = await fetchJSON('/api/exp/adjustments');
+    if (!rows.length) {
+      list.innerHTML = '<li class="py-2 text-gray-500">No EXP given yet.</li>';
+      return;
+    }
+    list.innerHTML = rows.map(r => {
+      const sign = r.amount > 0 ? '+' : '';
+      const color = r.amount > 0 ? 'text-hs-green' : 'text-red-600';
+      const date = new Date(r.created_at).toLocaleDateString();
+      return `
+        <li class="py-2 flex flex-wrap gap-x-3 gap-y-1 items-baseline">
+          <span class="font-semibold ${color}">${sign}${r.amount} EXP</span>
+          <span class="font-medium">${escapeHtml(r.user_name)}</span>
+          ${r.reason ? `<span class="text-gray-600">${escapeHtml(r.reason)}</span>` : ''}
+          <span class="text-gray-400 text-xs ml-auto">by ${escapeHtml(r.added_by_name)} &bull; ${date}</span>
+        </li>`;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = `<li class="py-2 text-red-600">${escapeHtml(err.message)}</li>`;
   }
 }
 

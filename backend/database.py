@@ -156,6 +156,7 @@ async def init_db():
     await _migrate_service_hours(db)
     await _migrate_volunteer_signups(db)
     await _migrate_catering_requests(db)
+    await _migrate_exp_adjustments(db)
     await db.commit()
     await db.close()
 
@@ -287,6 +288,19 @@ async def _migrate_service_hours(db):
             hours REAL NOT NULL,
             service_date TEXT,
             description TEXT,
+            added_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )"""
+    )
+
+
+async def _migrate_exp_adjustments(db):
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS exp_adjustments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT,
             added_by TEXT NOT NULL,
             created_at TEXT NOT NULL
         )"""

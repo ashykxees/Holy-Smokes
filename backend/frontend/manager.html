@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/styles.css?v=9">
   <script src="/js/app.js?v=14"></script>
-  <script src="/js/manager.js?v=8"></script>
+  <script src="/js/manager.js?v=9"></script>
 </head>
 <body class="min-h-screen flex flex-col md:flex-row">
   <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
@@ -70,6 +70,31 @@
         </form>
       </section>
     </div>
+
+    <section class="card mt-6">
+      <h2 class="text-lg font-semibold mb-1">Give EXP</h2>
+      <p class="text-sm text-gray-500 mb-4">Add EXP to a member's leaderboard total. Use a negative number to take EXP away.</p>
+      <form id="exp-form" class="grid md:grid-cols-4 gap-4 items-end">
+        <div>
+          <label for="exp-user" class="block text-sm font-medium text-gray-700 mb-1">Member</label>
+          <select id="exp-user" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+            <option value="">Choose a member</option>
+          </select>
+        </div>
+        <div>
+          <label for="exp-amount" class="block text-sm font-medium text-gray-700 mb-1">EXP</label>
+          <input id="exp-amount" type="number" step="1" required placeholder="50" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+        <div>
+          <label for="exp-reason" class="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+          <input id="exp-reason" type="text" maxlength="200" placeholder="Great work at the cook-off" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-700">
+        </div>
+        <button type="submit" class="btn-primary">Give EXP</button>
+      </form>
+      <p id="exp-status" class="text-sm mt-3 hidden"></p>
+      <h3 class="text-sm font-semibold text-gray-700 mt-6 mb-2">Recent EXP given</h3>
+      <ul id="exp-history" class="divide-y divide-gray-100 text-sm"></ul>
+    </section>
 
     <section class="card mt-6" data-channel="manager">
       <h2 class="text-lg font-semibold mb-4">Manager Chat</h2>

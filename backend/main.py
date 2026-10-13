@@ -633,6 +633,61 @@ async def exp_leaderboard(user: dict = Depends(get_current_user)):
     return rows
 
 
+@app.get("/api/exp/adjustments")
+async def list_exp_adjustments(user: dict = Depends(require_manager)):
+    database = await db.get_db()
+    cursor = await database.execute(
+        """SELECT a.id, a.amount, a.reason, a.created_at,
+                  COALESCE(u.name, a.user_email) AS user_name,
+                  COALESCE(g.name, a.added_by) AS added_by_name
+           FROM exp_adjustments a
+           LEFT JOIN users u ON u.email = a.user_email
+           LEFT JOIN users g ON g.email = a.added_by
+           ORDER BY a.id DESC LIMIT 20"""
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    await database.close()
+    return rows
+
+
+@app.post("/api/exp/adjust")
+async def adjust_exp(request: Request, user: dict = Depends(require_manager)):
+    data = await request.json()
+    email = (data.get("user_email") or "").strip().lower()
+    try:
+        amount = int(data.get("amount"))
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="EXP must be a whole number")
+    if amount == 0 or abs(amount) > 10000:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="EXP must be between -10000 and 10000 and not 0",
+        )
+    reason = (data.get("reason") or "").strip()[:200] or None
+    database = await db.get_db()
+    cursor = await database.execute(
+        "SELECT exp_total FROM users WHERE email = ? AND is_approved = 1", (email,)
+    )
+    row = await cursor.fetchone()
+    if not row:
+        await database.close()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    current = int(row["exp_total"] or 0)
+    total = max(0, current + amount)
+    applied = total - current
+    if applied == 0:
+        await database.close()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="This member already has 0 EXP")
+    await database.execute("UPDATE users SET exp_total = ? WHERE email = ?", (total, email))
+    await database.execute(
+        "INSERT INTO exp_adjustments (user_email, amount, reason, added_by, created_at) VALUES (?, ?, ?, ?, ?)",
+        (email, applied, reason, user["email"], db.now_iso()),
+    )
+    await database.commit()
+    await database.close()
+    return {"email": email, "exp_total": total, "applied": applied}
+
+
 def _require_manager_or_owner(user: dict):
     if not (user.get("is_manager") or user.get("is_owner")):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Manager access required")

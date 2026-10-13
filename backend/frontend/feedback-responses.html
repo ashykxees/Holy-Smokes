@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feedback Responses | Holy Smokes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css?v=9">
+  <script src="/js/app.js?v=16"></script>
+  <script src="/js/feedback-responses.js?v=1"></script>
+  <style>
+    .fr-member {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.625rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      text-align: left;
+    }
+
+    .fr-member:hover {
+      background-color: #f9fafb;
+    }
+
+    .fr-member.active {
+      border-color: var(--hs-green);
+      background-color: rgba(50, 74, 42, 0.06);
+    }
+
+    .fr-count {
+      min-width: 1.75rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+      background-color: rgba(50, 74, 42, 0.1);
+      color: var(--hs-green);
+    }
+
+    .fr-count.none {
+      background-color: #f3f4f6;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="nav" class="bg-white border-r border-gray-200 w-full md:w-64 md:min-h-screen flex flex-col"></aside>
+  <main class="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">Feedback Responses</h1>
+      <p id="summary" class="text-gray-500">Loading...</p>
+    </header>
+
+    <div class="grid md:grid-cols-3 gap-6 items-start">
+      <section class="card md:col-span-1">
+        <input id="member-search" type="search" placeholder="Search members" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-green-700">
+        <div id="member-list" class="space-y-1"></div>
+      </section>
+
+      <section class="md:col-span-2">
+        <div id="member-detail" class="card text-gray-500">Choose a member to see their answers.</div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -112,8 +112,7 @@ function onAuthReady(user) {
     document.getElementById('feedback-form').classList.remove('hidden');
   });
   if (user && user.is_manager) {
-    document.getElementById('responses-section').classList.remove('hidden');
-    loadResponses();
+    document.getElementById('responses-link').classList.remove('hidden');
   }
 }
 
@@ -186,39 +185,8 @@ async function submitFeedback(e) {
     document.getElementById('feedback-form').classList.add('hidden');
     document.getElementById('feedback-thanks').classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (currentUser && currentUser.is_manager) {
-      loadResponses();
-    }
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
-  }
-}
-
-async function loadResponses() {
-  const container = document.getElementById('responses');
-  try {
-    const rows = await fetchJSON('/api/feedback');
-    if (!rows.length) {
-      container.innerHTML = '<p class="text-sm text-gray-500">No responses yet.</p>';
-      return;
-    }
-    container.innerHTML = rows.map(r => `
-      <details class="card">
-        <summary class="cursor-pointer flex flex-wrap items-baseline gap-x-3">
-          <span class="font-semibold">${escapeHtml(r.user_name || r.user_email)}</span>
-          <span class="text-sm text-gray-500">${escapeHtml(r.user_email)}</span>
-          <span class="text-xs text-gray-400 ml-auto">${formatTime(r.created_at)}</span>
-        </summary>
-        <dl class="mt-4 space-y-3 text-sm">
-          ${r.answers.map(a => `
-            <div>
-              <dt class="font-medium text-gray-700">${escapeHtml(a.question)}</dt>
-              <dd class="text-gray-600 whitespace-pre-wrap">${a.answer ? escapeHtml(a.answer) : '<span class="text-gray-400">No answer</span>'}</dd>
-            </div>`).join('')}
-        </dl>
-      </details>`).join('');
-  } catch (err) {
-    container.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(err.message)}</p>`;
   }
 }

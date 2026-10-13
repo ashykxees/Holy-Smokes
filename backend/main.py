@@ -526,7 +526,7 @@ async def list_feedback(user: dict = Depends(require_manager)):
     database = await db.get_db()
     cursor = await database.execute(
         """SELECT id, user_email, user_name, answers, created_at
-           FROM feedback_responses ORDER BY id DESC LIMIT 200"""
+           FROM feedback_responses ORDER BY id DESC"""
     )
     rows = [dict(r) for r in await cursor.fetchall()]
     await database.close()
